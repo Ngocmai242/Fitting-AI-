@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AI Style Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Hover effect for gradient buttons */
+        .gradient-btn-admin {
+            background: linear-gradient(135deg, #A8D8FF 0%, #B8E9B8 100%) !important;
+            border: none !important;
+            color: white !important;
+            display: inline-block;
+            width: auto;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-top: 10px;
+            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        .gradient-btn-admin:hover {
+            background: linear-gradient(135deg, #76A9D6 0%, #8BC98B 100%) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+            color: white !important;
+        }
+
+        .btn-login-main {
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .btn-login-main:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Fix whitespace issue */
+        body {
+            padding-top: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <!-- Left Side: Login Form -->
+            <div class="auth-left">
+                <div class="auth-box-clean">
+                    <div class="logo">AuraFit</div>
+                    <h2>Welcome Back</h2>
+                    <p class="auth-subtitle">Login to access your virtual wardrobe</p>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label>Username, Email or Phone</label>
+                            <input type="text" id="login-input" required placeholder="Enter your details">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="login-password" required placeholder="Enter your password">
+                        </div>
+
+                        <div class="form-options">
+                            <label class="remember-me">
+                                <input type="checkbox"> Remember me
+                            </label>
+                            <a href="#" class="forgot-pass">Forgot Password?</a>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block btn-login-main">Login</button>
+                    </form>
+
+                    <div class="auth-footer">
+                        Don't have an account? <a href="register.html">Register now</a>
+                        <br><br>
+                        <a href="admin_login.html" class="btn btn-secondary gradient-btn-admin">Login
+                            as Admin</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Manga Image -->
+            <div class="auth-right">
+                <img src="assets/login-bg.png" alt="Anime Fashion" class="auth-bg-img">
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=6"></script>
+</body>
+
+</html>

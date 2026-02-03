@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - AuraFit</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Shared Text Shadow Class for White Text on Pastel */
+        /* Shared Text Shadow Class for White Text on Pastel */
+        .white-text-shadow {
+            /* Medium Gray Outline + Drop Shadow */
+            text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+            padding-top: var(--nav-height);
+            background-color: #fdfdfd;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid #e0efff;
+            /* Subtle Blue Border */
+            padding: 2rem 1rem;
+            position: fixed;
+            top: var(--nav-height);
+            bottom: 0;
+            overflow-y: auto;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .main-admin-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(255, 183, 197, 0.05), rgba(162, 210, 255, 0.05));
+            /* Very light pastel bg */
+        }
+
+        .sidebar-menu a {
+            display: block;
+            padding: 12px 15px;
+            color: #666;
+            /* Softer gray */
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-weight: 500;
+            transition: 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-menu a:hover,
+        .sidebar-menu a.active {
+            /* Pastel Blue/Pink Gradient for Active/Hover */
+            background: linear-gradient(90deg, var(--pastel-blue), var(--pastel-pink));
+            color: white;
+            box-shadow: 0 4px 10px rgba(162, 210, 255, 0.4);
+            /* Medium Gray Outline */
+            text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar-menu a:hover i,
+        .sidebar-menu a.active i {
+            /* Icons are inside, inheriting color white is fine */
+        }
+
+        .sidebar-menu i {
+            width: 25px;
+            text-align: center;
+            margin-right: 10px;
+            color: var(--pastel-blue-dark);
+            /* Default icon color */
+        }
+
+        .sidebar-menu a:hover i,
+        .sidebar-menu a.active i {
+            color: white;
+        }
+
+        .admin-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            /* Softer shadow */
+            margin-bottom: 2rem;
+            border: 1px solid rgba(162, 210, 255, 0.2);
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            /* Borders will be colored inline below or we can use classes */
+            border-left: 5px solid var(--pastel-pink);
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            margin: 0.5rem 0 0;
+            color: #444;
+        }
+
+        .stat-card p {
+            color: #888;
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        /* Gradient I Icon Before Section Titles */
+        .section-title::before {
+            content: 'I';
+            display: inline-block;
+            margin-right: 15px;
+            font-weight: 700;
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--pastel-blue), var(--pastel-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+        }
+
+        .section-title {
+            margin-bottom: 3rem !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar (Pastel Theme) -->
+    <nav
+        style="background: linear-gradient(90deg, var(--pastel-blue-nav), var(--pastel-pink-nav)) !important; box-shadow: 0 4px 20px rgba(118, 169, 214, 0.2);">
+        <div class="logo"
+            style="color: white !important; text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 4px 8px rgba(0,0,0,0.4);">
+            AuraFit ADMIN</div>
+        <div class="nav-links">
+            <span
+                style="color:white; margin-right:20px; font-weight:600; text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 4px 8px rgba(0,0,0,0.4);">Welcome,
+                Admin</span>
+            <a href="#" onclick="logout()"
+                style="color: white; border: 2px solid white; padding: 5px 15px; border-radius: 20px; font-weight:600; text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 2px 4px rgba(0,0,0,0.3);">Logout</a>
+        </div>
+    </nav>
+
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-menu">
+                <a href="#dashboard" class="active" onclick="showAdminModule('dashboard')"><i
+                        class="fas fa-chart-line"></i> Dashboard</a>
+                <a href="#products" onclick="showAdminModule('products')"><i class="fas fa-tshirt"></i> Outfit &
+                    Product</a>
+                <a href="#crawl" onclick="showAdminModule('crawl')"><i class="fas fa-spider"></i> Crawl Data</a>
+                <a href="#mapping" onclick="showAdminModule('mapping')"><i class="fas fa-link"></i> Mapping & Shop</a>
+                <a href="#ai" onclick="showAdminModule('ai')"><i class="fas fa-brain"></i> AI Recommendation</a>
+                <a href="#users" onclick="showAdminModule('users')"><i class="fas fa-users-cog"></i> User Management</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-admin-content">
+
+            <!-- Dashboard Module -->
+            <div id="mod-dashboard" class="admin-module">
+                <h2 class="section-title" style="text-align: left;">Overview</h2>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <p>Total Users</p>
+                        <h3>1,250</h3>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--pastel-blue);">
+                        <p>Active Outfits</p>
+                        <h3>456</h3>
+                    </div>
+                    <div class="stat-card" style="border-color: var(--success);">
+                        <p>Clicks Today</p>
+                        <h3>3,402</h3>
+                    </div>
+                </div>
+                <div class="admin-card">
+                    <h3>Recent Activity</h3>
+                    <p>User X clicked on Outfit Y...</p>
+                    <p>Crawler updated 50 products...</p>
+                </div>
+            </div>
+
+            <!-- Products Module -->
+            <div id="mod-products" class="admin-module hidden">
+                <h2 class="section-title" style="text-align: left;">Manage Outfits</h2>
+                <div class="admin-card">
+                    <button class="btn btn-primary" style="width: auto; margin-bottom: 1rem;"><i
+                            class="fas fa-plus"></i> Add New Outfit</button>
+                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #f0f0f0;">
+                                <th style="padding: 10px;">ID</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 10px;">001</td>
+                                <td>Summer Floral Dress</td>
+                                <td>Dress</td>
+                                <td><button class="btn-sm">Edit</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Crawl Module -->
+            <div id="mod-crawl" class="admin-module hidden">
+                <h2 class="section-title" style="text-align: left;">Data Crawler</h2>
+                <div class="admin-card">
+                    <div class="form-group">
+                        <label>Source URL (Shopee/Shop)</label>
+                        <input type="text" id="crawl-url-input" placeholder="https://shopee.vn/..."
+                            value="https://shopee.vn/coolmate">
+                    </div>
+                    <button class="btn btn-secondary" onclick="startCrawl()" style="width: auto;">Start
+                        Crawling</button>
+                    <div id="crawl-logs"
+                        style="margin-top: 1rem; background: #000; color: #0f0; padding: 1rem; border-radius: 8px; font-family: monospace; min-height: 100px; max-height: 300px; overflow-y: auto;">
+                        > Ready to crawl...
+                    </div>
+                    <!-- Results Area -->
+                    <div id="crawl-results" style="margin-top: 20px; display: none;">
+                        <h3>Crawled Results</h3>
+                        <div class="stat-grid" id="crawl-results-grid">
+                            <!-- Items will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mapping Module -->
+            <div id="mod-mapping" class="admin-module hidden">
+                <h2 class="section-title" style="text-align: left;">Outfit Mapping</h2>
+                <div class="admin-card">
+                    <p>Map items to shop links here.</p>
+                </div>
+            </div>
+
+            <!-- AI Module -->
+            <div id="mod-ai" class="admin-module hidden">
+                <h2 class="section-title" style="text-align: left;">AI Recommendation Rules</h2>
+                <div class="admin-card">
+                    <p>Adjust weighting for body types and styles.</p>
+                </div>
+            </div>
+
+            <!-- Users Module -->
+            <div id="mod-users" class="admin-module hidden">
+                <h2 class="section-title" style="text-align: left;">User Management</h2>
+                <div class="admin-card">
+                    <p>Manage User Roles and Access.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="script.js?v=5"></script>
+    <script>
+        // Inline script for simple tab switching
+        function showAdminModule(modId) {
+            // Hide all
+            document.querySelectorAll('.admin-module').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.sidebar-menu a').forEach(el => el.classList.remove('active'));
+
+            // Show target
+            document.getElementById('mod-' + modId).classList.remove('hidden');
+
+            // Highlight menu
+            // Simple approach: find link with href ending in modId
+            const links = document.querySelectorAll('.sidebar-menu a');
+            for (let link of links) {
+                if (link.getAttribute('href') === '#' + modId) {
+                    link.classList.add('active');
+                }
+            }
+        }
+
+        // Crawl Function
+        async function startCrawl() {
+            const urlInput = document.getElementById('crawl-url-input');
+            const logDiv = document.getElementById('crawl-logs');
+            const resultsDiv = document.getElementById('crawl-results');
+            const resultsGrid = document.getElementById('crawl-results-grid');
+            const url = urlInput.value;
+
+            if (!url) {
+                alert('Please enter a valid Shopee URL');
+                return;
+            }
+
+            // Reset UI
+            logDiv.innerHTML = '> Ready to crawl...<br>';
+            resultsDiv.style.display = 'none';
+            resultsGrid.innerHTML = '';
+
+            function log(msg) {
+                logDiv.innerHTML += `> ${msg}<br>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            try {
+                log(`Connecting to: ${url}...`);
+                log('Initializing proxy...');
+
+                // Simulate steps
+                await new Promise(r => setTimeout(r, 800));
+                log('Bypassing anti-bot protection...');
+                await new Promise(r => setTimeout(r, 800));
+                log('Connection established. Parsing page...');
+
+                const response = await fetch('/api/crawl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    log('Extracting product data...');
+                    await new Promise(r => setTimeout(r, 500));
+                    log('Downloading images...');
+                    await new Promise(r => setTimeout(r, 500));
+                    log(`SUCCESS: Crawled ${data.count} items.`);
+
+                    // Render Results
+                    resultsDiv.style.display = 'block';
+                    data.products.forEach(prod => {
+                        const card = document.createElement('div');
+                        card.className = 'stat-card';
+                        card.style.padding = '1rem';
+                        card.innerHTML = `
+                            <img src="${prod.image}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">
+                            <h4 style="font-size: 1rem; margin-bottom: 5px;">${prod.name}</h4>
+                            <p style="color: var(--pastel-pink-dark); font-weight: bold;">${prod.price.toLocaleString()} VND</p>
+                            <span style="font-size: 0.8rem; background: #eee; padding: 2px 8px; border-radius: 4px;">${prod.category}</span>
+                        `;
+                        resultsGrid.appendChild(card);
+                    });
+                } else {
+                    console.error('Crawl Error:', data);
+                    log(`ERROR: ${data.message || 'Server Error'}`);
+                    alert(`Crawl Failed: ${data.message || 'Unknown Server Error'}`);
+                }
+
+            } catch (error) {
+                console.error(error);
+                log(`CRITICAL ERROR: ${error.message}`);
+                alert(`Request Failed: ${error.message}\nCheck logs.`);
+            }
+        }
+
+        // Initial Check
+        document.addEventListener('DOMContentLoaded', () => {
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (!user || user.role !== 'ADMIN') {
+                // Security Redirect
+                alert('Access Denied: Admin Rights Required');
+                window.location.href = 'admin_login.html';
+            }
+        });
+    </script>
+</body>
+
+</html>

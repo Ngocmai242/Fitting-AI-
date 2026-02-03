@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Backend Connection Test</title>
+</head>
+
+<body>
+    <h1>Testing Connection to Backend...</h1>
+    <div id="status">Connecting...</div>
+    <div id="result"></div>
+
+    <script>
+        async function test() {
+            const status = document.getElementById('status');
+            const result = document.getElementById('result');
+            try {
+                // Try 127.0.0.1
+                status.innerText = 'Trying http://127.0.0.1:5000/api/outfits...';
+                const res = await fetch('http://127.0.0.1:5000/api/outfits');
+                const text = await res.text();
+                status.innerText = 'SUCCESS! Connected to Backend.';
+                status.style.color = 'green';
+                result.innerText = text;
+            } catch (e) {
+                status.innerText = 'FAILED: ' + e.message;
+                status.style.color = 'red';
+
+                // Try localhost fallback
+                try {
+                    status.innerText += '\nRetrying with http://localhost:5000/api/outfits...';
+                    const res2 = await fetch('http://localhost:5000/api/outfits');
+                    const text2 = await res2.text();
+                    status.innerText = 'SUCCESS! Connected via localhost.';
+                    status.style.color = 'green';
+                    result.innerText = text2;
+                } catch (e2) {
+                    status.innerHTML += '<br>Both failed. Backend is likely not running or blocked.';
+                }
+            }
+        }
+        test();
+    </script>
+</body>
+
+</html>

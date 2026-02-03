@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Node/Frontend
+node_modules/
+npm-debug.log
+
+# Uploads & User Content (Giữ lại thư mục uploads nhưng không giữ file bên trong, trừ .gitkeep nếu có)
+frontend/uploads/*
+!frontend/uploads/.gitkeep
+backend/instance/
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+
+# System
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - AuraFit</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Hover effect for gradient buttons */
+        .gradient-btn-back {
+            background: linear-gradient(135deg, #FFB6D9 0%, #A8D8FF 100%) !important;
+            border: none !important;
+            color: white !important;
+            display: inline-block;
+            width: auto;
+            font-size: 1rem;
+            font-weight: 700;
+            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        .gradient-btn-back:hover {
+            background: linear-gradient(135deg, #FF8FB3 0%, #76A9D6 100%) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+            color: white !important;
+        }
+
+        .btn-login-main {
+            background: #B8E9B8 !important;
+            /* Solid pastel green */
+            border: none !important;
+            color: white !important;
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .btn-login-main:hover {
+            background: #8BC98B !important;
+            /* Darker green on hover */
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+            color: white !important;
+        }
+
+        /* Fix whitespace issue */
+        body {
+            padding-top: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <!-- Left Side: Login Form -->
+            <div class="auth-left">
+                <div class="auth-box-clean">
+                    <div class="logo">AuraFit Admin</div>
+                    <h2>Admin Portal</h2>
+                    <p class="auth-subtitle">Secure Access for Administrators</p>
+                    <form id="adminLoginForm">
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center;"><span
+                                    style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Username</label>
+                            <input type="text" id="admin-input" required placeholder="Admin Username">
+                        </div>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center;"><span
+                                    style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Password</label>
+                            <input type="password" id="admin-password" required placeholder="Admin Password">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block btn-login-main">Login
+                            to Dashboard</button>
+                    </form>
+
+                    <div class="auth-footer">
+                        <a href="login.html" class="btn btn-secondary gradient-btn-back"><span
+                                style="margin-right: 1.2em;">&larr;</span>Back to User Login</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Background -->
+            <div class="auth-right"
+                style="background: url('assets/admin_dynamic_bg.png') no-repeat center center/cover;">
+                <!-- Image only -->
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=15"></script>
+</body>
+
+</html>

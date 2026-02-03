@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - AI Style Platform</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <!-- Left Side: Register Form -->
+            <div class="auth-left">
+                <div class="auth-box-clean">
+                    <div class="logo">AuraFit</div>
+                    <h2>Create Account</h2>
+                    <p class="auth-subtitle">Join us to discover your perfect style</p>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="reg-username" required placeholder="Pick a username">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="reg-email" required placeholder="Your email address">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="tel" id="reg-phone" placeholder="Optional">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="reg-password" required placeholder="Create a password">
+                            <small style="color: #999; display: block; margin-top: 5px;">Min 8 chars, uppercase, number,
+                                symbol</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm Password</label>
+                            <input type="password" id="reg-confirm-password" required placeholder="Confirm password">
+                        </div>
+                        <div class="form-group"
+                            style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;">
+                            <input type="checkbox" id="tos" required style="width: auto;">
+                            <label for="tos" style="margin: 0; display: inline; font-weight: 500;">I agree to the Terms
+                                of Service</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
+                    </form>
+
+                    <div class="auth-footer">
+                        Already have an account? <a href="login.html">Login here</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Manga Image (Same as Login) -->
+            <div class="auth-right">
+                <img src="assets/login-bg.png" alt="Anime Fashion" class="auth-bg-img">
+            </div>
+        </div>
+    </div>
+    <script src="script.js?v=2"></script>
+</body>
+
+</html>

@@ -1,0 +1,1132 @@
+/* Pastel Minimalism Theme */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-color: #FDFBF7;
+    /* Milk/Cream */
+    --card-bg: #FFFFFF;
+    --text-main: #333333;
+    --text-light: #555555;
+
+    /* Darker/Bolder Pastels */
+    --pastel-pink: #FFB7C5;
+    /* Softer sakura pink */
+    --pastel-pink-nav: #E68FA3;
+    --pastel-pink-dark: #D46A83;
+
+    --pastel-blue: #A2D2FF;
+    /* Sky blue */
+    --pastel-blue-nav: #78A9D6;
+    --pastel-blue-dark: #4B7FAC;
+
+    /* Removed Green - sticking to Pink/Blue theme */
+    --pastel-green: #A2D2FF;
+    /* Fallback to blue if used */
+    --pastel-green-dark: #4B7FAC;
+
+    --pastel-dark-gray: #4A4E52;
+    /* Contrast background */
+
+    --success: #66BB6A;
+    --error: #EF5350;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --radius: 12px;
+    --nav-height: 70px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Outfit', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    line-height: 1.6;
+    padding-top: var(--nav-height);
+    /* Space for fixed nav */
+    min-height: 100vh;
+}
+
+/* 1. Fixed Navigation */
+/* 1. Fixed Navigation - Blue to Pink Gradient */
+nav {
+    background: linear-gradient(90deg, var(--pastel-blue-nav), var(--pastel-pink-nav));
+    padding: 0 4rem;
+    height: var(--nav-height);
+    box-shadow: 0 4px 20px rgba(118, 169, 214, 0.2);
+    /* Colored shadow */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+nav .logo {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #FFFFFF !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    margin: 0 !important;
+    line-height: normal;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.5rem;
+    height: 100%;
+    align-items: center;
+}
+
+/* Nav Links & Dropdowns */
+.nav-item-container {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: 0.3s;
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+}
+
+.nav-links a:hover,
+.nav-links a.active,
+.nav-item-container:hover>a {
+    background: transparent;
+    color: white;
+    text-decoration: none;
+}
+
+.nav-links a:hover span,
+.nav-links a.active span,
+.nav-item-container:hover>a span {
+    text-decoration: underline;
+    text-underline-offset: 6px;
+    /* Increased spacing approx 1.5 */
+}
+
+/* Dropdown Menu Styles */
+.nav-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    width: 260px;
+    /* Wider for icons + text */
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    padding: 10px 0;
+    flex-direction: column;
+    z-index: 1100;
+    display: block;
+    margin-top: 20px;
+}
+
+.nav-item-container:hover .nav-dropdown {
+    opacity: 1;
+    visibility: visible;
+    margin-top: 0;
+}
+
+
+
+/* Dropdown Arrow */
+.nav-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 8px 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent white transparent;
+}
+
+/* Dropdown Link Overrides */
+.nav-links .nav-dropdown a {
+    color: var(--text-main) !important;
+    text-decoration: none !important;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #f9f9f9;
+    background: transparent !important;
+    white-space: normal;
+    text-align: left;
+    border-radius: 0;
+    height: auto;
+}
+
+.nav-links .nav-dropdown a:last-child {
+    border-bottom: none;
+}
+
+.nav-links .nav-dropdown a:hover {
+    background-color: #fcfcfc !important;
+    color: var(--pastel-pink-dark) !important;
+    padding-left: 25px;
+    text-decoration: none !important;
+    border-bottom: 1px solid #f9f9f9;
+}
+
+.nav-dropdown i {
+    width: 25px;
+    color: var(--pastel-blue);
+    margin-right: 10px;
+    text-align: center;
+}
+
+/* User Menu & Avatar */
+.user-menu {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    margin-left: 1rem;
+}
+
+.nav-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid white;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.nav-avatar:hover {
+    transform: scale(1.1);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    background: white;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    width: 180px;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1001;
+}
+
+.dropdown-menu.show {
+    display: flex;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    /* Center Vertically */
+    padding: 12px 20px;
+    color: var(--text-main) !important;
+    text-decoration: none;
+    transition: 0.2s;
+    font-size: 0.95rem;
+    gap: 15px;
+    /* Increased spacing between icon and text to ~1.5 */
+}
+
+/* Separator between Profile and Logout */
+.dropdown-divider {
+    height: 1px;
+    margin: 0.5rem 0;
+    overflow: hidden;
+    background-color: #d1d1d1;
+    /* Visible light gray */
+    width: 100%;
+}
+
+.dropdown-item:hover {
+    background: #f9f9f9;
+    color: var(--pastel-pink-dark);
+}
+
+/* Nav Overrides */
+.nav-cta-btn {
+    background: white !important;
+    color: var(--pastel-pink-dark) !important;
+    font-weight: 700 !important;
+    padding: 8px 20px !important;
+    border-radius: 30px !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    margin-left: 10px;
+    border: none;
+}
+
+
+
+.nav-cta-btn:hover {
+    background: #fff8f8 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    text-decoration: none !important;
+}
+
+/* 2. Hero Carousel (Full Width) */
+/* 2. Hero Carousel (Full Width) */
+.hero-carousel-section {
+    position: relative;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    height: 70vh;
+    /* Changed to 70% section height */
+    overflow: hidden;
+}
+
+.carousel-container {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+}
+
+.carousel-viewport {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.carousel-track {
+    display: flex;
+    height: 100%;
+    transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.hero-slide {
+    min-width: 100%;
+    height: 100%;
+    position: relative;
+    background: linear-gradient(135deg, var(--pastel-blue), var(--pastel-pink));
+    /* Fallback for no image */
+}
+
+.hero-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Back to cover to fill width */
+    object-position: center 20%;
+    /* Focus slightly above center to ensure heads are seen */
+    filter: brightness(0.9);
+}
+
+.slide-overlay {
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    /* Move to left side */
+    right: auto;
+    transform: translateY(-50%);
+    /* Center vertically only */
+    color: white;
+    text-align: left;
+    /* Left align text */
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 0, 0, 0.5);
+    max-width: 600px;
+    /* Limit width to not overlap image too much */
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0;
+}
+
+
+
+.slide-overlay h2 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    line-height: 1.1;
+    /* Gradient text or strong white against shadow */
+    color: white;
+    /* "Bao trọn bằng màu xám nhạt và có shadow" */
+    text-shadow:
+        0 0 2px #aaa,
+        /* "Bao trọn" - soft outline */
+        0 4px 8px rgba(0, 0, 0, 0.3);
+    /* Shadow */
+}
+
+.slide-overlay p {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+    text-shadow:
+        0 0 2px #aaa,
+        0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.slide-cta {
+    padding: 8px 20px;
+    font-size: 0.9rem;
+    background: var(--pastel-pink);
+    color: white;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.slide-cta:hover {
+    background: white;
+    color: var(--pastel-pink-dark);
+    transform: scale(1.05);
+}
+
+/* Carousel Buttons */
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 20;
+    font-size: 1.5rem;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.3s;
+}
+
+.prev-btn {
+    left: 30px;
+}
+
+.next-btn {
+    right: 30px;
+}
+
+.carousel-btn:hover {
+    background: white;
+    color: var(--pastel-dark-gray);
+}
+
+/* Intro Bar */
+/* Intro Bar - Removed */
+.intro-bar {
+    display: none;
+}
+
+/* Features Section */
+.features-section {
+    padding: 2rem;
+    /* Reduced from 5rem */
+    background: var(--bg-color);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    transition: transform 0.3s;
+    cursor: pointer;
+    border: 1px solid #f0f0f0;
+}
+
+.feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    border-color: var(--pastel-blue);
+}
+
+.icon-bubble {
+    width: 70px;
+    height: 70px;
+    background: #f0f7fa;
+    /* Light pastel blue bg */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 1.8rem;
+    color: var(--pastel-blue-dark);
+}
+
+.feature-card h3 {
+    margin-bottom: 0.8rem;
+    color: #333;
+}
+
+.feature-card p {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+/* CTA Banner */
+.cta-banner {
+    background: linear-gradient(135deg, #a8c0ff 0%, #3f2b96 100%);
+    /* Example gradient, let's stick to pastel theme */
+    background: linear-gradient(135deg, var(--pastel-pink), var(--pastel-blue));
+    padding: 4rem 2rem;
+    text-align: center;
+    color: white;
+    margin: 4rem 0 0 0;
+}
+
+.cta-banner h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.cta-banner p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.cta-banner-btn {
+    background: white;
+    color: var(--pastel-pink-dark);
+    padding: 15px 40px;
+    border-radius: 50px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    transition: 0.3s;
+}
+
+.cta-banner-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* FooterStyles */
+footer {
+    background: #333;
+    color: white;
+    padding: 4rem 2rem 1rem;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 3rem;
+    margin-bottom: 3rem;
+}
+
+.footer-col h3 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    color: var(--pastel-pink);
+}
+
+.footer-col h4 {
+    margin-bottom: 1rem;
+    color: #ddd;
+}
+
+.footer-col p,
+.footer-col a {
+    color: #aaa;
+    margin-bottom: 0.5rem;
+    display: block;
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.footer-col a:hover {
+    color: white;
+}
+
+.social-links {
+    display: flex;
+    gap: 15px;
+}
+
+.social-links a i {
+    font-size: 1.5rem;
+    transition: 0.3s;
+}
+
+.social-links a:hover i {
+    color: var(--pastel-blue);
+}
+
+.footer-bottom {
+    text-align: center;
+    border-top: 1px solid #444;
+    padding-top: 1.5rem;
+    font-size: 0.85rem;
+    color: #777;
+    margin-top: 2rem;
+}
+
+/* Auth & Forms (Centered Floating Card Split Layout) */
+.auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    /* Soft Pink to Blue background */
+    background: linear-gradient(135deg, var(--pastel-pink), var(--pastel-blue));
+    padding: 2rem;
+}
+
+.auth-card {
+    display: flex;
+    width: 100%;
+    max-width: 1000px;
+    /* The "Large Rectangle" */
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    /* Strong shadow */
+    min-height: 600px;
+}
+
+.auth-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    padding: 3rem;
+    /* More spacing */
+}
+
+.auth-right {
+    flex: 1;
+    background: #fdfdfd;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+    border-left: 1px solid #f0f0f0;
+}
+
+@media (max-width: 768px) {
+    .auth-right {
+        display: none;
+        /* Hide image on mobile */
+    }
+}
+
+.auth-bg-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.auth-box-clean {
+    width: 100%;
+    max-width: 400px;
+    padding: 2rem;
+}
+
+.auth-box-clean .logo {
+    font-size: 2rem;
+    font-weight: 800;
+    /* Brand gradient text: Blue-Pink combo */
+    background: linear-gradient(45deg, var(--pastel-pink-dark), var(--pastel-blue-dark));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.auth-box-clean h2 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    color: #333;
+    /* Darker text */
+    text-align: center;
+}
+
+.auth-subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.auth-footer a {
+    color: var(--pastel-blue-dark);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    color: #444;
+    /* Darker label for visibility */
+    font-weight: 600;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"] {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background-color: #fafafa;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--pastel-blue);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(174, 198, 207, 0.2);
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    width: 100%;
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: var(--pastel-pink);
+    color: white;
+    /* Changed specifically for contrast with darker pink */
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background-color: var(--pastel-pink-dark);
+}
+
+.btn-secondary {
+    background-color: var(--pastel-blue);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: var(--pastel-blue-dark);
+}
+
+/* Utilities */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* Grid for Shop */
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.card-body {
+    padding: 1rem;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    background: #eee;
+}
+
+/* Profile Styles */
+.profile-grid {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.profile-sidebar {
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.profile-content-card {
+    background: white;
+    padding: 2rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.profile-nav-item {
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    color: var(--text-light);
+}
+
+.profile-nav-item:hover,
+.profile-nav-item.active {
+    background: var(--pastel-pink);
+    color: white;
+}
+
+/* Tool Grid */
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.tool-card {
+    background: #fafafa;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid #eee;
+}
+
+.tool-card:hover {
+    border-color: var(--pastel-blue);
+    background: white;
+}
+
+/* Profile Redesign - Account Information Card */
+#profile-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    /* Use the new floral pastel background */
+    background: url('assets/profile_bg.png') no-repeat center center/cover;
+    z-index: 2000;
+    overflow-y: auto;
+    padding-top: 80px;
+    /* offset for fixed nav */
+    padding-bottom: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+.profile-container {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.profile-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    /* Stronger shadow as requested */
+    border: 1px solid rgba(162, 210, 255, 0.3);
+    /* Subtle Blue Border */
+    position: relative;
+    width: 100%;
+}
+
+/* Header Section */
+.profile-header-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 3rem;
+    gap: 1.5rem;
+}
+
+.profile-avatar-wrapper {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.avatar-lg {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--pastel-pink);
+    /* Pink Border */
+    box-shadow: 0 5px 15px rgba(212, 106, 131, 0.2);
+}
+
+.btn-upload-avatar {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    width: 35px;
+    height: 35px;
+    background: var(--pastel-dark-gray);
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border: none;
+    /* Remove default border to use the white border */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.btn-upload-avatar:hover {
+    background: var(--pastel-blue-dark);
+    transform: scale(1.1);
+}
+
+.profile-header-info {
+    text-align: center;
+}
+
+.profile-header-info h3 {
+    font-size: 1.5rem;
+    color: var(--pastel-dark-gray);
+    /* Dark Gray Text */
+    font-weight: 700;
+    margin: 0;
+}
+
+/* Form Grid */
+.profile-form-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.form-row {
+    display: flex;
+    gap: 2rem;
+}
+
+/* Responsive Form Row */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .profile-card {
+        padding: 1.5rem;
+    }
+}
+
+.form-group.half {
+    flex: 1;
+}
+
+.form-group.full {
+    width: 100%;
+}
+
+.form-group label {
+    font-size: 0.95rem;
+    color: var(--pastel-dark-gray);
+    /* Dark Gray Label */
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--text-main);
+    background: #fdfdfd;
+    transition: 0.2s;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    /* Added shadow to inputs as requested */
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: var(--pastel-blue);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(162, 210, 255, 0.3);
+    /* Blue Focus Halo */
+    outline: none;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--pastel-pink);
+    /* Pink Checkbox */
+    box-shadow: none;
+}
+
+.checkbox-group label {
+    margin: 0;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.dob-inputs {
+    display: flex;
+    gap: 10px;
+}
+
+.dob-inputs select {
+    flex: 1;
+}
+
+/* Buttons */
+.profile-actions {
+    display: flex;
+    justify-content: space-between;
+    /* Separate buttons left and right as requested */
+    margin-top: 2rem;
+    width: 100%;
+    /* No flex-direction needed if we adhere to DOM order, but user wants left and right */
+}
+
+.btn-save {
+    /* Gradient Blue to Pink Pastel */
+    background: linear-gradient(90deg, var(--pastel-blue), var(--pastel-pink));
+    color: white;
+    min-width: 150px;
+    border-radius: 8px;
+    font-weight: 700;
+    border: none;
+    padding: 12px 24px;
+    /* Gray text Stroke/Shadow */
+    text-shadow: 0px 0px 2px gray;
+    /* Move to right if it's first child? No, space-between puts 1st left, 2nd right. HTML has save then cancel. */
+    /* If we want Save on Right and Cancel on Left, we should swap DOM order or use order property or row-reverse */
+    order: 2;
+}
+
+.btn-save:hover {
+    background: linear-gradient(90deg, var(--pastel-blue-dark), var(--pastel-pink-dark));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-cancel {
+    background-color: white;
+    color: var(--pastel-dark-gray);
+    border: 1px solid #ddd;
+    min-width: 150px;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    padding: 12px 24px;
+    order: 1;
+}
+
+.btn-cancel:hover {
+    background-color: #f5f5f5;
+    color: #000;
+}
+
+.required {
+    color: var(--error);
+    margin-left: 3px;
+}

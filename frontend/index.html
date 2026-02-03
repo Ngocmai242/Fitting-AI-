@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Style Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- 1. Fixed Navigation -->
+    <!-- 1. Fixed Navigation -->
+    <!-- 1. Fixed Navigation -->
+    <nav>
+        <div class="logo">AuraFit</div>
+        <div class="nav-links">
+            <a href="#home" onclick="scrollToSection('home-view')"><span></span>Home</span></a>
+
+            <!-- Virtual Try-On Dropdown -->
+            <div class="nav-item-container">
+                <a href="#tryon" onclick="scrollToSection('tryon')"><span>Virtual Try-On</span> <i
+                        class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 5px;"></i></a>
+                <div class="nav-dropdown">
+                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-upload"></i> Upload User Photo</a>
+                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-tshirt"></i> Try
+                        Tops/Bottoms/Dresses</a>
+                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-user-check"></i> Display on User
+                        Body</a>
+                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-columns"></i> Compare Outfits</a>
+                </div>
+            </div>
+
+            <!-- Body Analysis Dropdown -->
+            <div class="nav-item-container">
+                <a href="#analysis" onclick="scrollToSection('analysis')"><span>Style Recommendation</span> <i
+                        class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 5px;"></i></a>
+                <div class="nav-dropdown">
+                    <a href="#" onclick="scrollToSection('analysis')"><i class="fas fa-ruler-horizontal"></i> Body
+                        Proportion Analysis</a>
+                    <a href="#" onclick="scrollToSection('analysis')"><i class="fas fa-shapes"></i> Identify Body
+                        Shape</a>
+                    <a href="#" onclick="scrollToSection('analysis')"><i class="fas fa-lightbulb"></i> Style
+                        Regommendations</a>
+                    <a href="#" onclick="scrollToSection('analysis')"><i class="fas fa-filter"></i> Filter Styles</a>
+                </div>
+            </div>
+
+            <!-- Image Processing Dropdown -->
+            <div class="nav-item-container">
+                <a href="#tools" onclick="scrollToSection('tools')"><span>Image Tools</span> <i
+                        class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 5px;"></i></a>
+                <div class="nav-dropdown">
+                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-eraser"></i> Remove Background</a>
+                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-image"></i> Change Background</a>
+                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-palette"></i> Recolor Outfit</a>
+                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-magic"></i> Upscale Image</a>
+                </div>
+            </div>
+
+            <!-- Shop Dropdown -->
+            <div class="nav-item-container">
+                <a href="#shop" onclick="scrollToSection('shop')"><span>Shop</span> <i class="fas fa-chevron-down"
+                        style="font-size: 0.7rem; margin-left: 5px;"></i></a>
+                <div class="nav-dropdown">
+                    <a href="#" onclick="scrollToSection('shop')"><i class="fas fa-search-dollar"></i> View Price &
+                        Details</a>
+                    <a href="#" onclick="scrollToSection('shop')"><i class="fas fa-shopping-cart"></i> Buy Now
+                        (Shopee/Web)</a>
+                </div>
+            </div>
+
+
+
+            <!-- CTA Button in Nav -->
+            <a href="#tryon" onclick="scrollToSection('tryon')" class="nav-cta-btn">Start Styling</a>
+
+            <!-- User Menu -->
+            <div class="user-menu" id="user-menu">
+                <img src="https://ui-avatars.com/api/?name=User&background=FF9EB5&color=fff" alt="Avatar"
+                    class="nav-avatar" id="nav-avatar">
+                <div class="dropdown-menu" id="user-dropdown">
+                    <a href="#" class="dropdown-item" onclick="toggleProfileView()"><i class="fas fa-user-circle"></i>
+                        Profile</a> <!-- Changed to English -->
+                    <div class="dropdown-divider"></div>
+                    <a href="#" class="dropdown-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    <!-- Changed to English -->
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 2. Hero Carousel -->
+    <section class="hero-carousel-section" id="home">
+        <button class="carousel-btn prev-btn"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-viewport">
+            <div class="carousel-track" id="carousel-track">
+                <!-- Slide 1 -->
+                <div class="hero-slide active">
+                    <img src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=1600&h=900&fit=crop"
+                        alt="Streetwear"> <!-- New Landscape Image -->
+                    <div class="slide-overlay left-align"> <!-- Added left-align class -->
+                        <h2>Young & Energetic</h2>
+                        <p>Try on casual summer outfits directly on your body</p> <!-- English -->
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button> <!-- English -->
+                    </div>
+                </div>
+                <!-- Slide 2 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1600&h=900&fit=crop"
+                        alt="Modern Chic">
+                    <div class="slide-overlay">
+                        <h2>Modern Chic</h2>
+                        <p>Modern style for the office lady</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+                <!-- Slide 3 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=1600&h=900&fit=crop"
+                        alt="Evening Elegance">
+                    <div class="slide-overlay">
+                        <h2>Evening Elegance</h2>
+                        <p>Shine at every party</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+                <!-- Slide 4 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=1600&h=900&fit=crop"
+                        alt="Summer Vibes">
+                    <div class="slide-overlay">
+                        <h2>Summer Vibes</h2>
+                        <p>Fresh and dynamic</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+                <!-- Slide 5 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=1600&h=900&fit=crop"
+                        alt="Street Style">
+                    <div class="slide-overlay">
+                        <h2>Urban Street Style</h2>
+                        <p>Assert your unique personality</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+                <!-- Slide 6 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=1600&h=900&fit=crop"
+                        alt="Office Wear">
+                    <div class="slide-overlay">
+                        <h2>Professional & Sleek</h2>
+                        <p>Perfect for the workplace</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+
+                <!-- Slide 8 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=1600&h=900&fit=crop"
+                        alt="Party Look">
+                    <div class="slide-overlay">
+                        <h2>Party Glam</h2>
+                        <p>Stand out from the crowd</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+                <!-- Slide 9 -->
+                <div class="hero-slide">
+                    <img src="assets/sporty_banner.png" alt="Active & Sporty">
+                    <div class="slide-overlay">
+                        <h2>Active & Sporty</h2>
+                        <p>Ready for every activity</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+                <!-- Slide 10 -->
+                <div class="hero-slide">
+                    <img src="https://images.unsplash.com/photo-1502716119720-b23a93e5fe1b?w=1600&h=900&fit=crop"
+                        alt="Boho Chic">
+                    <div class="slide-overlay">
+                        <h2>Boho Chic</h2>
+                        <p>Free and spirited</p>
+                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-btn next-btn"><i class="fas fa-chevron-right"></i></button>
+
+    </section>
+
+    <!-- Main Content Area -->
+    <div class="main-content" style="max-width: 100%; padding: 0;">
+
+        <!-- ID for smooth scrolling -->
+        <div id="home-view">
+
+            <!-- 3. Features Section (New) -->
+            <section class="features-section" id="features" style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
+                <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
+                        style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Key
+                    Features</h2> <!-- English -->
+                <!-- Added margin-bottom to align with visual rhythm -->
+                <div class="feature-grid" style="margin-bottom: 2rem;">
+                    <div class="feature-card" onclick="scrollToSection('tryon')">
+                        <div class="icon-bubble"><i class="fas fa-tshirt"></i></div>
+                        <h3>Virtual Try-On</h3> <!-- English -->
+                        <p>Upload photo and try on clothes directly on your body.</p>
+                    </div>
+                    <div class="feature-card" onclick="scrollToSection('analysis')">
+                        <div class="icon-bubble"><i class="fas fa-ruler-combined"></i></div>
+                        <h3>Body Analysis</h3> <!-- English -->
+                        <p>Analyze body shape, recommend best outfits.</p>
+                    </div>
+                    <div class="feature-card" onclick="scrollToSection('tools')">
+                        <div class="icon-bubble"><i class="fas fa-magic"></i></div>
+                        <h3>Image Editing</h3> <!-- English -->
+                        <p>Remove bg, change background, recolor outfits automatically.</p>
+                    </div>
+                    <div class="feature-card" onclick="scrollToSection('shop')">
+                        <div class="icon-bubble"><i class="fas fa-shopping-bag"></i></div>
+                        <h3>Smart Shop</h3> <!-- English -->
+                        <p>View prices and buy your favorite looks instantly.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- A. Try On (Darker Pastel Background) -->
+            <section id="tryon" class="tryon-section-bg">
+                <div style="max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
+                    <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 1rem;"><span
+                            style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Virtual
+                        Try-On Demo</h2>
+                    <div class="ai-grid" style="grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;">
+                        <div class="feature-box" style="text-align: left; padding: 1.5rem;">
+                            <h3><i class="fas fa-magic"></i> Instant Makeover</h3>
+                            <p style="margin: 1.5rem 0; font-size: 1.1rem; color: #666;">
+                                Upload your photo or choose a model. Our AI maps outfits to your body geometry in
+                                seconds.
+                            </p>
+                            <button class="btn btn-primary" style="font-size: 1.1rem; padding: 15px 30px;">Start Styling
+                                Now</button>
+                        </div>
+
+                        <!-- Upload/Preview Frame (Brighter emphasis) -->
+                        <div
+                            style="background: white; padding: 2rem; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center;">
+                            <div
+                                style="border: 2px dashed var(--pastel-pink); border-radius: 8px; height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #fffcfc;">
+                                <i class="fas fa-cloud-upload-alt"
+                                    style="font-size: 3rem; color: var(--pastel-blue); margin-bottom: 1rem;"></i>
+                                <p><strong>Drop your photo here</strong></p>
+                                <p style="font-size: 0.9rem; color: #999;">or click to browse</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- B. Body Analysis -->
+            <section id="analysis" style="padding: 4rem 2rem; background: var(--bg-color);">
+                <div style="max-width: 1200px; margin: 0 auto;">
+                    <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
+                            style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>AI
+                        Body Analysis</h2>
+                    <div class="feature-box" style="text-align: center;">
+                        <i class="fas fa-ruler-combined"
+                            style="font-size: 3rem; color: var(--pastel-blue-dark); margin-bottom: 1rem;"></i>
+                        <h3>Discover Your Shape</h3>
+                        <p>Our AI analyzes your proportions to recommend the best fits for Hourglass, Pear, or Rectangle
+                            shapes.</p>
+                        <button class="btn btn-secondary" style="width: auto; margin-top: 1rem;">View Style
+                            Suggestions</button>
+                    </div>
+            </section>
+
+            <!-- C. Shop Links -->
+            <section id="shop" style="margin-bottom: 4rem; padding: 0 2rem;">
+                <div style="max-width: 1200px; margin: 0 auto;">
+                    <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
+                            style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Shop
+                        The Look</h2>
+                    <div class="shop-grid" id="shop-grid-container">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- D. Image Processing -->
+            <section id="tools" style="margin-bottom: 4rem; padding: 0 2rem;">
+                <div style="max-width: 1200px; margin: 0 auto;">
+                    <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
+                            style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Image
+                        Visualization</h2>
+                    <div class="tool-grid">
+                        <div class="tool-card">
+                            <i class="fas fa-eraser" style="font-size: 2rem; color: var(--pastel-pink);"></i>
+                            <h4>Remove BG</h4>
+                        </div>
+                        <div class="tool-card">
+                            <i class="fas fa-paint-brush" style="font-size: 2rem; color: var(--pastel-blue);"></i>
+                            <h4>Recolor</h4>
+                        </div>
+                        <div class="tool-card">
+                            <i class="fas fa-magic" style="font-size: 2rem; color: var(--success);"></i>
+                            <h4>Upscale</h4>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CTA Bottom Section -->
+            <section class="cta-banner">
+                <h2 style="text-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 0 15px rgba(0,0,0,0.3);">Ready to Transform Your
+                    Style?</h2> <!-- English -->
+                <p style="text-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 0 12px rgba(0,0,0,0.3);">Join thousands of AuraFit
+                    users today.</p> <!-- English -->
+                <button class="cta-banner-btn" onclick="scrollToSection('tryon')">Try Now</button> <!-- English -->
+            </section>
+
+        </div>
+
+        <!-- Profile Modal/View (Redesigned) -->
+        <div id="profile-view" class="hidden main-content">
+            <div class="profile-container">
+                <div class="profile-card">
+                    <button onclick="closeProfile()"
+                        style="position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-light);"><i
+                            class="fas fa-arrow-left"></i> Back</button>
+
+                    <h2 class="section-title text-center"
+                        style="color: var(--pastel-pink-dark); margin-bottom: 2rem; margin-top: 1rem;">
+                        Profile</h2>
+
+                    <!-- Top Section: Avatar & Basic Info Summary -->
+                    <div class="profile-header-section">
+                        <!-- Avatar with Upload -->
+                        <div class="profile-avatar-wrapper">
+                            <img src="https://ui-avatars.com/api/?name=User&background=FF9EB5&color=fff"
+                                id="profile-avatar-main" class="avatar-lg">
+                            <button type="button" class="btn-upload-avatar"
+                                onclick="document.getElementById('avatar-upload').click()"><i
+                                    class="fas fa-camera"></i></button>
+                            <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+                        </div>
+                        <!-- Name Display -->
+                        <div class="profile-header-info">
+                            <h3 id="profile-name-display">Ngo Thi Ngoc Anh</h3>
+                        </div>
+                    </div>
+
+                    <!-- Form Section -->
+                    <form id="profile-form" class="profile-form-grid">
+                        <!-- Row 1 -->
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label>Last Name <span class="required">*</span></label>
+                                <input type="text" id="p-lastname" value="Ngo">
+                            </div>
+                            <div class="form-group half">
+                                <label>Middle Name & First Name <span class="required">*</span></label>
+                                <input type="text" id="p-firstname" value="Thi Ngoc Anh">
+                            </div>
+                        </div>
+
+                        <!-- Row 2 -->
+                        <div class="form-group full">
+                            <label>Email <span class="required">*</span></label>
+                            <input type="email" id="p-email" value="ngongocmai2@example.com">
+                        </div>
+
+
+
+                        <!-- Row 5 -->
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label>Phone <span class="required">*</span></label>
+                                <input type="tel" id="p-phone" value="0966625671">
+                            </div>
+                            <div class="form-group half">
+                                <label>Address <span class="required">*</span></label>
+                                <input type="text" id="p-address" value="Hà Nội">
+                            </div>
+                        </div>
+
+                        <!-- Row 6 -->
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label>Gender <span class="required">*</span></label>
+                                <select id="p-gender">
+                                    <option>Female</option>
+                                    <option>Male</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group half">
+                                <label>Date of birth <span class="required">*</span></label>
+                                <div class="dob-inputs">
+                                    <select id="dob-day">
+                                        <option>15</option>
+                                    </select>
+                                    <select id="dob-month">
+                                        <option>09</option>
+                                    </select>
+                                    <select id="dob-year">
+                                        <option>2004</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="profile-actions">
+                            <button type="button" class="btn btn-save" onclick="saveProfile()">Save</button>
+                            <button type="button" class="btn btn-cancel" onclick="closeProfile()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Admin Section Placeholder -->
+    <div id="admin-view" class="hidden main-content">
+        <h2>Admin Dashboard</h2>
+        <div id="admin-content"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer id="footer">
+        <div class="footer-content">
+            <div class="footer-col">
+                <h3>AuraFit</h3>
+                <p>The leading virtual try-on and style recommendation platform.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Contact</h4>
+                <p>Email: support@aurafit.ai</p>
+                <p>Hotline: 1900-AURA</p>
+            </div>
+            <div class="footer-col">
+                <h4>Social</h4>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-facebook"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-tiktok"></i></a>
+                </div>
+            </div>
+            <div class="footer-col">
+                <h4>Policies</h4>
+                <a href="#">Terms of Use</a>
+                <a href="#">Privacy Policy</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2026 AuraFit. All rights reserved.
+        </div>
+    </footer>
+
+    <script src="script.js?v=15"></script>
+</body>
+
+</html>

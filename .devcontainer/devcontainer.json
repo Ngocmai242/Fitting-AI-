@@ -1,0 +1,20 @@
+{
+  "name": "AuraFit AI Platform",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "forwardPorts": [5050, 5500],
+  "postCreateCommand": "pip install -r backend/requirements.txt",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ritwickdey.liveserver"
+      ]
+    }
+  }
+}

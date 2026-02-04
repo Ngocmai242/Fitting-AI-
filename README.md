@@ -52,7 +52,24 @@ Server sẽ khởi động tại: `http://localhost:5000`
 Vì frontend sử dụng HTML thuần giao tiếp với API, bạn chỉ cần mở file trực tiếp:
 
 1. Vào thư mục `frontend`.
-2. Click đúp vào file `login.html` (hoặc `index.html`) để mở trong trình duyệt.
+2. click đúp vào file `login.html` (hoặc `index.html`) để mở trong trình duyệt.
+
+## Chạy trên GitHub Codespaces
+
+Dự án này đã được cấu hình để chạy trên GitHub Codespaces.
+
+1. Nhấn vào nút **Code** màu xanh lá cây trên GitHub.
+2. Chọn tab **Codespaces**.
+3. Nhấn **Create codespace on main**.
+4. Khi môi trường đã tải xong, mở **Terminal** (Ctrl + `).
+5. Chạy lệnh sau để cài đặt và khởi động backend:
+   ```bash
+   ./start.sh
+   ```
+6. Backend sẽ chạy ngầm. Để xem Frontend:
+   - Dùng tiện ích **Live Server** (đã được cài sẵn).
+   - Mở file `frontend/login.html`.
+   - Nhấn **Go Live** ở góc dưới bên phải cửa sổ VS Code.
 
 ## Chức năng
 

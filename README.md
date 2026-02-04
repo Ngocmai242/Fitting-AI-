@@ -56,20 +56,57 @@ Vì frontend sử dụng HTML thuần giao tiếp với API, bạn chỉ cần m
 
 ## Chạy trên GitHub Codespaces
 
-Dự án này đã được cấu hình để chạy trên GitHub Codespaces.
+Dự án này đã được cấu hình sẵn để chạy trên GitHub Codespaces với file `.devcontainer/devcontainer.json`.
 
-1. Nhấn vào nút **Code** màu xanh lá cây trên GitHub.
-2. Chọn tab **Codespaces**.
-3. Nhấn **Create codespace on main**.
-4. Khi môi trường đã tải xong, mở **Terminal** (Ctrl + `).
-5. Chạy lệnh sau để cài đặt và khởi động backend:
-   ```bash
-   ./start.sh
-   ```
-6. Backend sẽ chạy ngầm. Để xem Frontend:
-   - Dùng tiện ích **Live Server** (đã được cài sẵn).
-   - Mở file `frontend/login.html`.
-   - Nhấn **Go Live** ở góc dưới bên phải cửa sổ VS Code.
+### Bước 1: Tạo Codespace
+1. Truy cập: **https://github.com/Ngocmai242/Fitting-AI-**
+2. Nhấn vào nút **Code** (màu xanh lá cây).
+3. Chọn tab **Codespaces**.
+4. Nhấn **Create codespace on main** (hoặc **Open** nếu đã có Codespace).
+5. Đợi khoảng 1-2 phút để môi trường khởi tạo.
+
+### Bước 2: Khởi động Backend
+Khi Codespace đã mở xong, trong **Terminal** (Ctrl + ` hoặc View → Terminal), chạy:
+
+```bash
+# Cấp quyền thực thi cho script
+chmod +x start.sh
+
+# Chạy backend server
+./start.sh
+```
+
+**HOẶC** chạy trực tiếp:
+```bash
+python backend/run.py
+```
+
+**Lưu ý:** Backend sẽ chạy ở port **5050**. Bạn sẽ thấy thông báo:
+```
+>>> Starting AuraFit Server on Port 5050...
+```
+
+### Bước 3: Mở Frontend với Live Server
+1. Trong Explorer sidebar bên trái, mở file **`frontend/login.html`** hoặc **`frontend/index.html`**.
+2. Click chuột phải vào file → chọn **"Open with Live Server"**.
+3. **HOẶC** nhấn nút **"Go Live"** ở thanh status bar (góc dưới phải màn hình).
+
+Live Server sẽ tự động mở frontend trong một **Simple Browser** hoặc tab mới.
+
+### Bước 4: Port Forwarding
+GitHub Codespaces sẽ tự động forward ports:
+- **Port 5050** - Backend API
+- **Port 5500** - Live Server (Frontend)
+
+Nếu có popup "A service is available on port...", nhấn **Open in Browser**.
+
+### Khắc phục lỗi
+**Lỗi: `python: can't open file 'backend/app.py'`**
+- ✅ **Giải pháp:** Chạy `python backend/run.py` thay vì `backend/app.py`
+
+**Lỗi: CORS hoặc không kết nối được API**
+- ✅ **Đã được sửa:** Code tự động phát hiện môi trường Codespaces và cho phép CORS.
+- Nếu vẫn lỗi, thử rebuild container: `Ctrl+Shift+P` → **"Codespaces: Rebuild Container"**
 
 ## Chức năng
 

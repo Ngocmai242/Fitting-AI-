@@ -280,6 +280,7 @@
         </main>
     </div>
 
+    <script src="config.js"></script>
     <script src="script.js?v=5"></script>
     <script>
         // Inline script for simple tab switching
@@ -334,7 +335,7 @@
                 await new Promise(r => setTimeout(r, 800));
                 log('Connection established. Parsing page...');
 
-                const response = await fetch('/api/crawl', {
+                const response = await fetch(`${window.APP_CONFIG.getApiUrl()}/crawl`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: url })

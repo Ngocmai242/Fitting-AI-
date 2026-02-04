@@ -1,106 +1,25 @@
 import os
-import random
 import time
-from datetime import datetime
-from flask import Flask, request, jsonify, session, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
+import random
+from flask import Blueprint, request, jsonify, session, send_from_directory, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_cors import CORS
+from . import db
+from .models import User, Outfit, Product
 
-# Configure Flask to serve static files from ../frontend
-app = Flask(__name__, static_folder='../frontend', static_url_path='')
-app.secret_key = 'super_secret_key_for_session_management'
-# CORS is now less critical but kept for safety
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+main_bp = Blueprint('main', __name__)
 
 # --- Serve Frontend Routes ---
-@app.route('/')
+@main_bp.route('/')
 def serve_index():
-    return send_from_directory('../frontend', 'index.html')
+    return send_from_directory(current_app.static_folder, 'index.html')
 
-@app.route('/<path:path>')
+@main_bp.route('/<path:path>')
 def serve_static(path):
-    return send_from_directory('../frontend', path)
+    return send_from_directory(current_app.static_folder, path)
 
-# Database Config
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, '..', 'database', 'database_v2.db') # Updated to v2 to force schema refresh
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# --- API Routes ---
 
-db = SQLAlchemy(app)
-
-# --- Models ---
-# --- Models ---
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    phone = db.Column(db.String(20))
-    password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(10), default='USER')
-    
-    # Simple profile fields directly in User for demo simplicity
-    fullname = db.Column(db.String(100))
-    avatar = db.Column(db.String(500), default='https://ui-avatars.com/api/?name=User&background=FF9EB5&color=fff')
-    address = db.Column(db.String(200))
-    gender = db.Column(db.String(20))
-    dob = db.Column(db.String(20))
-
-class Product(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    image_path = db.Column(db.String(500))
-    shopee_link = db.Column(db.String(2000))
-    price = db.Column(db.Float)
-    category = db.Column(db.String(50)) # top/bottom/dress/accessory
-    sub_category = db.Column(db.String(50))
-    style = db.Column(db.String(50))
-    color = db.Column(db.String(50))
-    shop_name = db.Column(db.String(100))
-    crawl_date = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True)
-
-class Outfit(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    image_url = db.Column(db.String(500))
-    body_type = db.Column(db.String(50))
-    style = db.Column(db.String(50))
-    shop_link = db.Column(db.String(500))
-
-# Initialize DB
-with app.app_context():
-    if not os.path.exists(os.path.dirname(DB_PATH)):
-        os.makedirs(os.path.dirname(DB_PATH))
-    db.create_all()
-    
-    # Seed data if empty
-    if not Outfit.query.first():
-        seed_outfits = [
-            Outfit(name='Summer Floral Dress', image_url='https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=500', style='Casual', shop_link='https://shopee.vn/dress1', body_type='Hourglass'),
-            Outfit(name='Office Blazer Set', image_url='https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=500', style='Office', shop_link='https://lazada.vn/suit1', body_type='Rectangle'),
-        ]
-        db.session.add_all(seed_outfits)
-        db.session.commit()
-
-    # Seed Admin User if not exists
-    if not User.query.filter_by(username='admin').first():
-        admin_user = User(
-            username='admin',
-            email='admin@aurafit.com',
-            password=generate_password_hash('admin'),
-            role='ADMIN',
-            fullname='System Administrator',
-            avatar='https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff'
-        )
-        db.session.add(admin_user)
-        db.session.commit()
-        print(">>> Default Admin User Create: admin / admin")
-
-# --- Routes ---
-
-@app.route('/api/register', methods=['POST'])
+@main_bp.route('/api/register', methods=['POST'])
 def register():
     data = request.json
     if User.query.filter((User.username == data.get('username')) | (User.email == data.get('email'))).first():
@@ -123,11 +42,13 @@ def register():
     db.session.commit()
     return jsonify({'message': 'Registered successfully'}), 201
 
-@app.route('/api/login', methods=['POST'])
+@main_bp.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    login_input = data.get('login_input')
-    password = data.get('password')
+    login_input = data.get('login_input', '').strip()
+    password = data.get('password', '').strip()
+    
+    print(f"DEBUG LOGIN Attempt: Input='{login_input}', PwLen={len(password)}")
     
     user = User.query.filter(
         (User.username == login_input) | 
@@ -135,10 +56,10 @@ def login():
         (User.phone == login_input)
     ).first()
     
-    print(f"Login attempt for: {login_input}") # Debug
     if user:
+        print(f"DEBUG: User found: {user.username}, ID: {user.id}")
         if check_password_hash(user.password, password):
-             print("Password match!") 
+             print(f"DEBUG: Password MATCH for {user.username}") 
              session['user_id'] = user.id
              return jsonify({
                 'message': 'Login successful', 
@@ -156,7 +77,7 @@ def login():
     
     return jsonify({'message': 'Invalid credentials'}), 401
 
-@app.route('/api/profile', methods=['GET', 'POST', 'PUT'])
+@main_bp.route('/api/profile', methods=['GET', 'POST', 'PUT'])
 def profile():
     if request.method == 'GET':
         user_id = request.args.get('user_id')
@@ -171,7 +92,7 @@ def profile():
             'success': True,
             'profile': {
                 'id': user.id,
-                'user_id': user.id,
+                'user_id': user.id, 
                 'username': user.username,
                 'email': user.email,
                 'fullname': user.fullname,
@@ -213,10 +134,8 @@ def profile():
     if 'avatar_file' in request.files:
         file = request.files['avatar_file']
         if file.filename != '':
-            upload_folder = os.path.join(app.root_path, 'static', 'uploads') # This might need adjustment if served from frontend folder? No, app.root_path is backend.
-            # But we serve static from ../frontend
-            # Let's save to ../frontend/uploads for direct access
-            upload_folder = os.path.join(app.root_path, '..', 'frontend', 'uploads')
+            # We serve static from frontend/
+            upload_folder = os.path.join(current_app.static_folder, 'uploads')
             
             if not os.path.exists(upload_folder):
                 os.makedirs(upload_folder)
@@ -252,7 +171,7 @@ def profile():
         }
     }), 200
 
-@app.route('/api/outfits', methods=['GET', 'POST', 'DELETE'])
+@main_bp.route('/api/outfits', methods=['GET', 'POST', 'DELETE'])
 def outfits():
     if request.method == 'GET':
         outfits = Outfit.query.all()
@@ -281,7 +200,7 @@ def outfits():
             return jsonify({'message': 'Deleted'}), 200
         return jsonify({'message': 'Not found'}), 404
 
-@app.route('/api/crawl', methods=['POST'])
+@main_bp.route('/api/crawl', methods=['POST'])
 def crawl():
     data = request.json
     shop_url = data.get('url')
@@ -292,7 +211,7 @@ def crawl():
     # Simulate crawling delay
     time.sleep(2) 
     
-    # Mock Crawled Data (In real world, this would use Selenium/BS4)
+    # Mock Crawled Data
     crawled_products = [
         {
             'name': 'Áo thun cotton nữ form rộng',
@@ -330,7 +249,7 @@ def crawl():
             new_prod = Product(
                 name=item['name'],
                 image_path=item['image'],
-                shopee_link=shop_url, # Linking back to source
+                shopee_link=shop_url, 
                 price=item['price'],
                 category=item['category'],
                 sub_category=item['sub_category'],
@@ -342,7 +261,6 @@ def crawl():
             
         db.session.add_all(new_db_items)
         db.session.commit()
-        print(f"Successfully saved {len(new_db_items)} items for URL: {shop_url}")
         
         return jsonify({
             'message': 'Crawling successful', 
@@ -352,13 +270,9 @@ def crawl():
 
     except Exception as e:
         db.session.rollback()
-        print(f"CRAWL ERROR: {str(e)}")
         # Return error as JSON instead of crashing
         return jsonify({'message': f'Server Error: {str(e)}'}), 500
 
-@app.route('/api/tryon', methods=['GET'])
+@main_bp.route('/api/tryon', methods=['GET'])
 def tryon():
     return jsonify({'status': 'success'}), 200
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5050)

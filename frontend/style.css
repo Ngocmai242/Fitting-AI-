@@ -786,6 +786,73 @@ input:focus {
     background-color: var(--pastel-blue-dark);
 }
 
+.btn-guest {
+    background-color: var(--pastel-blue);
+    /* Pastel Blue */
+    color: white;
+    font-weight: 700;
+    /* text-transform: uppercase; REMOVED */
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+    /* Raised text effect */
+    transition: all 0.2s ease-in-out;
+    margin-top: 10px;
+}
+
+/* Custom Bubbly Pink Button (Guest -> Login) */
+.btn-bubble-pink {
+    background-color: #EF93B6;
+    /* Stronger Pink to match image e.g. Logout button background */
+    color: white !important;
+    font-weight: 800 !important;
+    font-size: 1rem !important;
+    padding: 8px 24px !important;
+    border-radius: 30px !important;
+    border: 3px solid white !important;
+    /* Thick white border */
+    box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.2),
+        inset 0 2px 5px rgba(255, 255, 255, 0.4);
+    /* Inner shine */
+    text-shadow:
+        2px 2px 0px rgba(0, 0, 0, 0.2),
+        /* Drop shadow for text */
+        -1px -1px 0 rgba(0, 0, 0, 0.1);
+    /* Slight outline feel */
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.5px;
+    height: auto;
+}
+
+.btn-bubble-pink:hover {
+    transform: scale(1.05);
+    box-shadow:
+        0 6px 15px rgba(0, 0, 0, 0.25),
+        inset 0 2px 5px rgba(255, 255, 255, 0.5);
+    background-color: #E082A8;
+}
+}
+
+.btn-guest:hover {
+    background-color: #78A9D6;
+    /* Darker Blue */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+}
+
+.btn-guest:active {
+    background-color: var(--pastel-blue-dark);
+    /* Darkest Blue */
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* Utilities */
 .hidden {
     display: none !important;

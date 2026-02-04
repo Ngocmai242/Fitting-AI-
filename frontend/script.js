@@ -1,11 +1,6 @@
-// Auto-detect API URL
-const API_URL = window.location.port === '5050'
-    ? '/api'
-    : 'http://127.0.0.1:5050/api';
-
-const BACKEND_URL = window.location.port === '5050'
-    ? ''
-    : 'http://127.0.0.1:5050';
+// Use Config
+const API_URL = window.APP_CONFIG.getApiUrl();
+const BACKEND_URL = window.APP_CONFIG.getBackendUrl();
 
 console.log('Using API URL:', API_URL);
 
@@ -37,7 +32,34 @@ function getAvatarUrl(user) {
     return url;
 }
 
+// EMERGENCY BYPASS
+// GUEST LOGIN
+window.guestLogin = function () {
+    const guestUser = {
+        username: "guest",
+        fullname: "Khách tham quan",
+        email: "",
+        role: "USER",
+        id: "guest",
+        user_id: "guest",
+        avatar: "https://ui-avatars.com/api/?name=Guest&background=e9ecef&color=333"
+    };
+    localStorage.setItem('user', JSON.stringify(guestUser));
+    window.location.href = 'index.html';
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+
+    // GLOBAL PORT ENFORCEMENT
+    // 1. Check for PORT 5500 and Redirect
+    // This is a safety measure to ensure users don't get stuck on the wrong port
+    if (window.location.port === '5500') {
+        let newPath = window.location.pathname;
+        // Fix path: remove '/frontend' if present (common when using Live Server from root)
+        newPath = newPath.replace('/frontend', '');
+        window.location.href = 'http://localhost:5050' + newPath;
+        return;
+    }
 
     // Auth Check
     const isAuthPage = document.body.contains(document.getElementById('loginForm')) ||
@@ -54,8 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const loginInput = document.getElementById('login-input').value;
-            const password = document.getElementById('login-password').value;
+            const loginInput = document.getElementById('login-input').value.trim();
+            const password = document.getElementById('login-password').value.trim();
 
             try {
                 console.log(`Sending login request to ${API_URL}/login`);
@@ -295,45 +317,59 @@ function populateDateDropdowns() {
 }
 
 async function checkUserSession() {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user) {
+    // Port check moved to global scope
+
+
+    const userStr = localStorage.getItem('user');
+    const userMenu = document.getElementById('user-menu');
+
+    // 2. Logic for Guest or Not Logged In
+    if (!userStr) {
+        if (userMenu) {
+            userMenu.innerHTML = '<a href="login.html" class="btn-bubble-pink">Login</a>';
+        }
+        // Don't redirect to login.html here so users can browse landing page if they want (optional, but good UX)
+        // If strict login required: window.location.replace('login.html');
+        // For now, let's strictly redirect if not on auth page (current logic expects login)
         window.location.replace('login.html');
         return;
     }
 
+    const user = JSON.parse(userStr);
+
+    // 3. Check if user is Guest
+    if (user.id === 'guest' || user.username === 'guest') {
+        if (userMenu) {
+            // Show "Log In" button instead of Avatar for Guests
+            userMenu.innerHTML = '<a href="login.html" class="btn-bubble-pink">Login</a>';
+        }
+        // Allow guest to stay on page
+        loadShopItems();
+        initCarousel();
+        return;
+    }
+
+    // 4. Normal Authenticated User Verification
     const currentPage = window.location.pathname.split('/').pop();
 
-    // 1. If Admin is on User Page -> Allow access (Do NOT redirect)
-    // if (user.role === 'ADMIN' && (currentPage === 'index.html' || currentPage === '')) {
-    //     window.location.replace('admin_index.html');
-    //     return;
-    // }
-
-    // 2. If User is on Admin Page -> Redirect to User Index (Security)
     if (user.role !== 'ADMIN' && currentPage === 'admin_index.html') {
         alert('Access Denied: Admin Rights Required');
         window.location.replace('index.html');
         return;
     }
 
-    // IMPORTANT: Fetch latest profile from server to get current avatar
-    // This ensures navbar always shows the latest avatar, not cached localStorage
+    // Fetch Profile to sync Avatar
     try {
         const userId = user.user_id || user.id;
         const res = await fetch(`${API_URL}/profile?user_id=${userId}&t=${new Date().getTime()}`, {
-            headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            }
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
         });
 
         if (res.ok) {
             const data = await res.json();
             if (data.success && data.profile) {
-                // Update localStorage with fresh data from server
                 localStorage.setItem('user', JSON.stringify(data.profile));
 
-                // Update Nav Avatar using Helper
                 const navImg = document.getElementById('nav-avatar');
                 if (navImg) {
                     navImg.src = getAvatarUrl(data.profile);
@@ -344,24 +380,14 @@ async function checkUserSession() {
                 }
             }
         } else {
-            // Fallback to localStorage if server fetch fails
             updateNavbarFromLocalStorage(user);
         }
     } catch (error) {
-        console.error('Error fetching profile on session check:', error);
-        // Fallback to localStorage if server is unreachable
+        console.error('Error fetching profile:', error);
         updateNavbarFromLocalStorage(user);
     }
 
-    if (user.role === 'ADMIN') {
-        // Allow Admin to view User Interface normaly on index.html
-        // We do NOT hide homeView anymore.
-        // Maybe add a specific button for Admin Dashboard if needed, but for now just treat as user.
-        loadShopItems();
-    } else {
-        // Load Shop items for User
-        loadShopItems();
-    }
+    loadShopItems();
 }
 
 // Helper function to update navbar from localStorage (fallback)

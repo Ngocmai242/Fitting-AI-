@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Connection Diagnosis</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            margin: 0 auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .pending {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        pre {
+            background: #eee;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="box">
+        <h1>🔍 AuraFit Diagnosis Tool</h1>
+        <p>Checking connection to Backend Server...</p>
+
+        <div id="config-info"></div>
+        <div id="status-box" class="status pending">Running Tests...</div>
+        <pre id="log-output"></pre>
+
+        <button onclick="runTest()" style="padding: 10px 20px; font-size: 1.1em; cursor: pointer;">Run Test
+            Again</button>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        function log(msg) {
+            document.getElementById('log-output').innerText += msg + '\n';
+        }
+
+        async function runTest() {
+            const api = window.APP_CONFIG.getApiUrl();
+            const statusBox = document.getElementById('status-box');
+            document.getElementById('log-output').innerText = '';
+
+            document.getElementById('config-info').innerHTML = `
+                <strong>Frontend:</strong> ${window.location.origin}<br>
+                <strong>Target API:</strong> ${api}
+            `;
+
+            statusBox.className = 'status pending';
+            statusBox.innerText = 'Testing Connection...';
+
+            log(`[INFO] Attempting to fetch ${api}/outfits...`);
+
+            if (window.location.port === '5500') {
+                log('[WARNING] You are on Port 5500 (VSCode Live Server).');
+                log('[SOLUTION] Please open http://localhost:5050 instead.');
+                statusBox.innerText += ' (Wrong Port)';
+            }
+
+            try {
+                const start = Date.now();
+                const res = await fetch(`${api}/outfits`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const duration = Date.now() - start;
+
+                log(`[INFO] Response Status: ${res.status} ${res.statusText}`);
+                log(`[INFO] Latency: ${duration}ms`);
+
+                if (res.ok) {
+                    statusBox.className = 'status success';
+                    statusBox.innerText = '✅ CONNECTION SUCCESSFUL';
+                    log('[SUCCESS] Backend is running and reachable!');
+                } else {
+                    const text = await res.text();
+                    statusBox.className = 'status error';
+                    statusBox.innerText = `❌ SERVER ERROR: ${res.status}`;
+                    log(`[ERROR] Server returned: ${text}`);
+                }
+            } catch (err) {
+                console.error(err);
+                statusBox.className = 'status error';
+                statusBox.innerText = '❌ CONNECTION FAILED';
+                log(`[FATAL] Fetch Error: ${err.message}`);
+                log('------------------------------------------------');
+                if (err.message.includes('Failed to fetch')) {
+                    log('[ANALYSIS] "Failed to fetch" usually means:');
+                    log('  1. The Backend Server is NOT running (check black window).');
+                    log('  2. CORS Violation (Browser blocked the request).');
+                    log('  3. Wrong Port (Config is pointing to wrong place).');
+                }
+            }
+        }
+
+        // Run on load
+        runTest();
+    </script>
+</body>
+
+</html>

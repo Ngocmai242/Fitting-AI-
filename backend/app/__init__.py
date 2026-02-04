@@ -19,28 +19,20 @@ def create_app():
     # Allow CORS with credentials for local development and Codespaces
     # Check if running in Codespaces
     codespace_name = os.getenv('CODESPACE_NAME')
-    github_codespaces_port_forwarding_domain = os.getenv('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN')
     
-    allowed_origins = [
-        "http://localhost:3000", 
-        "http://127.0.0.1:3000",
-        "http://localhost:5500", 
-        "http://127.0.0.1:5500",
-        "http://localhost:5050",
-        "http://127.0.0.1:5050"
-    ]
-    
-    # Add Codespaces URLs if running in Codespaces
-    if codespace_name and github_codespaces_port_forwarding_domain:
-        # Add common ports used in Codespaces
-        for port in [5050, 5500, 3000]:
-            allowed_origins.append(f"https://{codespace_name}-{port}.{github_codespaces_port_forwarding_domain}")
-    
-    # For Codespaces, also allow all github.dev origins
-    CORS(app, resources={r"/*": {
-        "origins": allowed_origins,
-        "supports_credentials": True
-    }}, supports_credentials=True, origins="*" if codespace_name else allowed_origins)
+    if codespace_name:
+        # In Codespaces, allow all origins due to dynamic URLs
+        CORS(app, resources={r"/*": {"origins": "*"}})
+    else:
+        # In local development, restrict to specific origins
+        CORS(app, resources={r"/*": {"origins": [
+            "http://localhost:3000", 
+            "http://127.0.0.1:3000",
+            "http://localhost:5500", 
+            "http://127.0.0.1:5500",
+            "http://localhost:5050",
+            "http://127.0.0.1:5050"
+        ]}}, supports_credentials=True)
 
     # Database Config
     # backend/app/../../database/database_v2.db

@@ -12,13 +12,16 @@ window.APP_CONFIG = {
             hostname = 'localhost';
         }
 
-        // If served from backend (port 5050), use relative path
-        if (port === '5050') {
+        // If served from backend (port 8080), use relative path
+        if (port === '8080') {
             return '/api';
         }
 
-        // For VSCode Live Server (5500) or others, point to backend port 5050
-        return `http://${hostname}:5050/api`;
+        // Fix for localhost IPv6 issues: force 127.0.0.1 if currently on localhost
+        if (hostname === 'localhost') hostname = '127.0.0.1';
+
+        // For VSCode Live Server (5500) or others, point to backend port 8080
+        return `http://${hostname}:8080/api`;
     },
 
     getBackendUrl: function () {
@@ -29,11 +32,14 @@ window.APP_CONFIG = {
             hostname = 'localhost';
         }
 
-        if (port === '5050') {
+        if (port === '8080') {
             return '';
         }
 
-        return `http://${hostname}:5050`;
+        // Fix for localhost IPv6 issues
+        if (hostname === 'localhost') hostname = '127.0.0.1';
+
+        return `http://${hostname}:8080`;
     }
 };
 

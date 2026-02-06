@@ -1,57 +1,64 @@
 @echo off
+title AuraFit Server
+cd /d "%~dp0"
 echo ===================================================
-echo   AURAFIT REFACTORED LAUNCHER
+echo   AURAFIT LAUNCHER (ROBUST MODE)
 echo ===================================================
 echo.
+echo [1] Cleaning up old processes...
+taskkill /F /IM python.exe >nul 2>&1
 
-echo [1/4] Checking Environment...
-cd /d "%~dp0"
-python --version >nul 2>&1
+echo [2] Checking Python...
+python --version
 if %errorlevel% neq 0 (
-    echo CRITICAL ERROR: Python is not installed or not in PATH.
-    echo Please install Python 3.9+ and try again.
+    echo.
+    echo [ERROR] Python not found! 
+    echo Please install Python from https://www.python.org/downloads/
+    echo Make sure to check "Add Python to PATH" during installation.
     pause
     exit /b
 )
 echo Python found.
 
-echo.
-echo [2/4] Installing Dependencies (This may take a while)...
-pip install Flask flask-sqlalchemy flask-cors werkzeug
+echo [3] Checking Libraries...
+echo Installing/Verifying required packages...
+pip install -r backend/requirements.txt
 if %errorlevel% neq 0 (
-    echo Warning: Could not auto-install dependencies. 
-    echo Assuming they are already installed...
+    echo.
+    echo [WARNING] Pip install encountered errors.
+    echo attempting to continue, but server might fail...
 ) else (
-    echo Dependencies installed.
+    echo Libraries are ready.
 )
 
 echo.
-echo [3/4] Starting Backend Server (Port 5050)...
-echo       Starting from backend/run.py
-taskkill /F /IM python.exe >nul 2>&1
-start "AuraFit Backend" cmd /k "cd backend && python run.py || pause"
+echo [4] STARTING SERVER...
+echo ---------------------------------------------------
+echo 1. The server will start in this window.
+echo 2. The website will open in 5 seconds.
+echo 3. DO NOT CLOSE THIS WINDOW.
+echo ---------------------------------------------------
 
-echo.
-echo [4/4] Waiting 10 seconds for server to boot...
-timeout /t 10 >nul
+:: Start browser in 5 seconds
+:: We use 127.0.0.1 explicitly to avoid 'localhost' IPv6 issues
+start "" cmd /c "timeout /t 5 >nul && start http://127.0.0.1:8080/admin_login.html"
 
-echo.
-echo [DONE] Opening Application...
-echo. 
-echo IMPORTANT:
-echo Please use the browser window that opens automatically (Port 5050).
-echo DO NOT use "Go Live" or Port 5500 from VS Code.
-echo.
-start http://localhost:5050/
-start http://localhost:5050/admin_login.html
+:: Run Python in THIS window with Auto-Restart Loop
+cd backend
 
+:SERVER_LOOP
 echo.
 echo ===================================================
-echo   SYSTEM RUNNING
+echo [INFO] STARTING PRODUCTION SERVER (WAITRESS)
 echo ===================================================
-echo   - Backend: http://localhost:5050
-echo   - Frontend: Served by Backend
 echo.
-echo   DO NOT CLOSE THE BLACK BACKEND WINDOW.
+python server.py
+
+:: If python crashes, we reach here
+echo.
 echo ===================================================
-pause
+echo [CRITICAL] SERVER STOPPED UNEXPECTEDLY
+echo ===================================================
+echo Restarting in 2 seconds to ensure connectivity...
+timeout /t 2 >nul
+goto SERVER_LOOP

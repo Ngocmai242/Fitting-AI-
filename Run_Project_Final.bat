@@ -8,20 +8,14 @@ taskkill /F /IM python.exe >nul 2>&1
 echo.
 
 echo [2/2] Starting AuraFit Unified Server...
-echo       Web Interface: http://localhost:5050
+echo       Web Interface: http://localhost:8080
 echo.
 echo       -> Please wait for the browser to open...
 echo.
 
-start "AuraFit Server" cmd /k "cd backend && python app.py"
-
-REM Wait for server to boot
-timeout /t 5 >nul
-
-REM Open Admin Login directly from the backend server
-start http://localhost:5050/admin_login.html
+:: Launch start_app_v2.bat which now has the robust loop
+call start_app_v2.bat
 
 echo.
-echo SERVER RUNNING.
-echo If you close the black window, the website will stop.
+echo SERVER SESSION ENDED.
 pause

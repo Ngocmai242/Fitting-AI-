@@ -3,3 +3,4 @@ Flask-SQLAlchemy
 Flask-Cors
 werkzeug
 requests
+waitress

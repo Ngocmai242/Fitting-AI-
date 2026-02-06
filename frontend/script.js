@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let newPath = window.location.pathname;
         // Fix path: remove '/frontend' if present (common when using Live Server from root)
         newPath = newPath.replace('/frontend', '');
-        window.location.href = 'http://localhost:5050' + newPath;
+        window.location.href = 'http://localhost:8080' + newPath;
         return;
     }
 
@@ -90,8 +90,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`Response status: ${res.status}`);
 
                 if (!res.ok) {
-                    const text = await res.text();
-                    alert(`Server Error (${res.status}): ${text}`);
+                    const data = await res.json().catch(() => ({ message: res.statusText })); // Fallback if not JSON
+                    // Special handling for "Account not found" or auth errors
+                    if (res.status === 404 || res.status === 401) {
+                        alert(data.message || 'Login failed. Please check your credentials.');
+                    } else {
+                        alert(`Server Error (${res.status}): ${data.message || 'Unknown error'}`);
+                    }
                     return;
                 }
 
@@ -99,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (data.role === 'ADMIN') {
                     // Admin logging in via User Form -> Stay on User Site (index.html)
-                    // BUT give option or notify? No, just behave like a user.
                     alert('Login Success! Welcome Admin.');
                     localStorage.setItem('user', JSON.stringify(data));
                     window.location.href = 'index.html';
@@ -111,7 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error(err);
-                alert(`CRITICAL ERROR:\n${err.message}\n\nURL: ${API_URL}/login\nPlease check console (F12) for details.`);
+                if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                    alert("Connection Error: Unable to reach the server.\n\nPlease ensure the backend is running on port 8080.");
+                } else {
+                    alert(`An unexpected error occurred:\n${err.message}`);
+                }
             }
         });
     }
@@ -133,8 +141,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (!res.ok) {
-                    const text = await res.text();
-                    alert(`Server Error (${res.status}): ${text}`);
+                    const data = await res.json().catch(() => ({ message: res.statusText }));
+                    if (res.status === 404 || res.status === 401) {
+                        alert(data.message || 'Login failed. Please check your credentials.');
+                    } else {
+                        alert(`Server Error (${res.status}): ${data.message || 'Unknown error'}`);
+                    }
                     return;
                 }
 
@@ -150,7 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error(err);
-                alert(`CRITICAL ERROR:\n${err.message}\n\nURL: ${API_URL}/login\nPlease check console (F12) for details.`);
+                if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                    alert("Connection Error: Unable to reach the server.\n\nPlease ensure the backend is running on port 8080.");
+                } else {
+                    alert(`An unexpected error occurred:\n${err.message}`);
+                }
             }
         });
     }
@@ -242,7 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error(err);
-                alert('Connection Error. Backend might be offline.');
+                if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                    alert("Connection Error: Unable to reach the server.\n\nPlease ensure the backend is running on port 8080.");
+                } else {
+                    alert('Connection Error. Backend might be offline.');
+                }
             }
         });
     }
@@ -703,7 +723,7 @@ async function saveProfile() {
         }
     } catch (e) {
         console.error('Error updating profile:', e);
-        alert(`Error updating profile:\n${e.message}\n\nPlease check:\n1. Backend is running on port 5050\n2. Open console (F12) for more details`);
+        alert(`Error updating profile:\n${e.message}\n\nPlease check:\n1. Backend is running on port 8080\n2. Open console (F12) for more details`);
     }
 }
 

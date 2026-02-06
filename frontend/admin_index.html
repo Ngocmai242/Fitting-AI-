@@ -382,8 +382,9 @@
             const user = JSON.parse(localStorage.getItem('user'));
             if (!user || user.role !== 'ADMIN') {
                 // Security Redirect
-                alert('Access Denied: Admin Rights Required');
-                window.location.href = 'admin_login.html';
+                // Security Redirect - Quietly go to login
+                // alert('Access Denied: Admin Rights Required'); // Removed annoying alert
+                window.location.replace('admin_login.html');
             }
         });
     </script>

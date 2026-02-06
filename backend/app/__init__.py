@@ -24,15 +24,8 @@ def create_app():
         # In Codespaces, allow all origins due to dynamic URLs
         CORS(app, resources={r"/*": {"origins": "*"}})
     else:
-        # In local development, restrict to specific origins
-        CORS(app, resources={r"/*": {"origins": [
-            "http://localhost:3000", 
-            "http://127.0.0.1:3000",
-            "http://localhost:5500", 
-            "http://127.0.0.1:5500",
-            "http://localhost:5050",
-            "http://127.0.0.1:5050"
-        ]}}, supports_credentials=True)
+        # In local development, enable CORS for all origins to ensure "file://" and other local setups work without connection failure.
+        CORS(app, resources={r"/*": {"origins": "*"}})
 
     # Database Config
     # backend/app/../../database/database_v2.db

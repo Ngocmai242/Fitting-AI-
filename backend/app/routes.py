@@ -74,8 +74,10 @@ def login():
                 'gender': user.gender,
                 'dob': user.dob
             }), 200
+        else:
+             return jsonify({'message': 'Invalid password. Please try again.'}), 401
     
-    return jsonify({'message': 'Invalid credentials'}), 401
+    return jsonify({'message': 'The account does not exist. Please log in again.'}), 404
 
 @main_bp.route('/api/profile', methods=['GET', 'POST', 'PUT'])
 def profile():

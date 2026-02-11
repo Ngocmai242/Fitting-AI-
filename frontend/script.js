@@ -103,10 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
 
                 if (data.role === 'ADMIN') {
-                    // Admin logging in via User Form -> Stay on User Site (index.html)
-                    alert('Login Success! Welcome Admin.');
+                    // Admin logging in via User Form -> Redirect to Admin Dashboard
+                    alert('Login Success! Welcome Admin. Redirecting to Dashboard...');
                     localStorage.setItem('user', JSON.stringify(data));
-                    window.location.href = 'index.html';
+                    window.location.href = 'admin_index.html';
                 } else {
                     alert('Login Success! Redirecting...');
                     localStorage.setItem('user', JSON.stringify(data));
@@ -231,11 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             console.log('Registering...');
 
-            const username = document.getElementById('reg-username').value;
-            const email = document.getElementById('reg-email').value;
-            const phone = document.getElementById('reg-phone').value;
-            const password = document.getElementById('reg-password').value;
-            const confirm = document.getElementById('reg-confirm-password').value;
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const phone = document.getElementById('reg-phone').value.trim();
+            const password = document.getElementById('reg-password').value.trim();
+            const confirm = document.getElementById('reg-confirm-password').value.trim();
 
             if (password !== confirm) {
                 alert("Passwords do not match!");

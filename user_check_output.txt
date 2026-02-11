@@ -1,0 +1,11 @@
+User 'mai' found:
+ - ID: 2
+ - Username: mai
+ - Email: ngongocmai242@gmail.com
+ - Role: ADMIN
+ - Status: Active
+ - Fullname: mai
+
+All users:
+ - mai | Role: ADMIN | Status: Active
+ - admin | Role: ADMIN | Status: Active

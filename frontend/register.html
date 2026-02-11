@@ -6,6 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - AI Style Platform</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Remove whitespace at top for auth pages */
+        body {
+            padding-top: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
 </head>
 
 <body>
@@ -20,7 +29,7 @@
                     <form id="registerForm">
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" id="reg-username" required placeholder="Pick a username">
+                            <input type="text" id="reg-username" name="username" required placeholder="Username">
                         </div>
                         <div class="form-group">
                             <label>Email</label>

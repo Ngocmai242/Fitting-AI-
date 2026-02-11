@@ -1,0 +1,14 @@
+{
+    "name": "aurafit-project",
+    "version": "1.0.0",
+    "description": "AI Virtual Fitting & Style Recommendation Platform",
+    "scripts": {
+        "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+        "backend": "python backend/server_dev.py",
+        "frontend": "http-server frontend -p 5500 -c-1 --cors -o admin_login.html"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "http-server": "^14.1.1"
+    }
+}

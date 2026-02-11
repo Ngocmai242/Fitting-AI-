@@ -8,8 +8,10 @@
     <link rel="stylesheet" href="style.css">
     <style>
         /* Hover effect for gradient buttons */
+        /* Hover effect for gradient buttons */
         .gradient-btn-admin {
-            background: linear-gradient(135deg, #A8D8FF 0%, #B8E9B8 100%) !important;
+            /* Darker Pastel Blue to Green Gradient */
+            background: linear-gradient(135deg, #7ba4cf 0%, #81b888 100%) !important;
             border: none !important;
             color: white !important;
             display: inline-block;
@@ -17,14 +19,15 @@
             font-size: 1rem;
             font-weight: 700;
             margin-top: 10px;
-            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15);
+            text-shadow: none;
+            /* Removed shadow */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
         }
 
         .gradient-btn-admin:hover {
-            background: linear-gradient(135deg, #76A9D6 0%, #8BC98B 100%) !important;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(135deg, #6a92bf 0%, #6a9e71 100%) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
             transform: translateY(-2px);
             color: white !important;
         }
@@ -32,12 +35,17 @@
         .btn-login-main {
             font-weight: 700;
             font-size: 1.05rem;
-            text-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+            text-shadow: none;
             transition: all 0.3s ease;
+            background-color: var(--pastel-pink) !important;
+            /* Ensure darker pink */
+            border: none !important;
+            color: white !important;
         }
 
         .btn-login-main:hover {
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            background-color: var(--pastel-pink-dark) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
             transform: translateY(-2px);
         }
 

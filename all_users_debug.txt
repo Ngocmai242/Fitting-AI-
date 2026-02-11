@@ -1,0 +1,46 @@
+=== ALL USERS IN DATABASE ===
+
+
+--- User ID: 2 ---
+Username: mai
+Email: ngongocmai242@gmail.com
+Phone: 
+Role: USER
+Status: Active
+Fullname: mai 
+Created: 2026-02-09 03:22:11.293997
+Password Hash starts with: scrypt:32768:8:1$FCD...
+Password Hash length: 162
+
+--- User ID: 3 ---
+Username: admin
+Email: admin@gmail.com
+Phone: None
+Role: ADMIN
+Status: Active
+Fullname: admin
+Created: 2026-02-09 08:19:02.218493
+Password Hash starts with: scrypt:32768:8:1$vrz...
+Password Hash length: 162
+
+--- User ID: 4 ---
+Username: mai123
+Email: moonlightlonely242@gmail.com
+Phone: None
+Role: ADMIN
+Status: Active
+Fullname: mai123
+Created: 2026-02-09 08:39:43.106082
+Password Hash starts with: scrypt:32768:8:1$LaV...
+Password Hash length: 162
+
+--- User ID: 5 ---
+Username: nga 
+Email: nga242@gmail.com
+Phone: 
+Role: USER
+Status: Active
+Fullname: nga 
+Created: 2026-02-09 08:40:21.544219
+Password Hash starts with: scrypt:32768:8:1$mVo...
+Password Hash length: 162

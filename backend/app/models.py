@@ -15,6 +15,8 @@ class User(db.Model):
     address = db.Column(db.String(200))
     gender = db.Column(db.String(20))
     dob = db.Column(db.String(20))
+    status = db.Column(db.String(20), default='Active')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -24,7 +26,10 @@ class Product(db.Model):
     price = db.Column(db.Float)
     category = db.Column(db.String(50)) # top/bottom/dress/accessory
     sub_category = db.Column(db.String(50))
+    gender = db.Column(db.String(50))  # Nam/Nữ/Unisex/Trẻ em
+    material = db.Column(db.String(100))  # Cotton, Kaki, Jeans, etc.
     style = db.Column(db.String(50))
+    details = db.Column(db.String(200))  # Cổ tròn, Tay ngắn, etc.
     color = db.Column(db.String(50))
     shop_name = db.Column(db.String(100))
     crawl_date = db.Column(db.DateTime, default=datetime.utcnow)

@@ -8,21 +8,20 @@
     --text-main: #333333;
     --text-light: #555555;
 
-    /* Darker/Bolder Pastels */
-    --pastel-pink: #FFB7C5;
-    /* Softer sakura pink */
-    --pastel-pink-nav: #E68FA3;
-    --pastel-pink-dark: #D46A83;
+    /* Darker/Bolder Pastels for White Text Visibility */
+    --pastel-pink: #d68c9e;
+    /* Darker pastel pink */
+    --pastel-pink-nav: #c4768b;
+    --pastel-pink-dark: #b05f76;
 
-    --pastel-blue: #A2D2FF;
-    /* Sky blue */
-    --pastel-blue-nav: #78A9D6;
-    --pastel-blue-dark: #4B7FAC;
+    --pastel-blue: #7ba4cf;
+    /* Darker pastel blue */
+    --pastel-blue-nav: #6a92bf;
+    --pastel-blue-dark: #587dad;
 
-    /* Removed Green - sticking to Pink/Blue theme */
-    --pastel-green: #A2D2FF;
-    /* Fallback to blue if used */
-    --pastel-green-dark: #4B7FAC;
+    --pastel-green: #81b888;
+    /* Darker pastel green */
+    --pastel-green-dark: #6a9e71;
 
     --pastel-dark-gray: #4A4E52;
     /* Contrast background */
@@ -791,13 +790,48 @@ input:focus {
     /* Pastel Blue */
     color: white;
     font-weight: 700;
-    /* text-transform: uppercase; REMOVED */
     letter-spacing: 0.5px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-    /* Raised text effect */
+    text-shadow: none;
     transition: all 0.2s ease-in-out;
     margin-top: 10px;
+}
+
+.btn-guest:hover {
+    background-color: var(--pastel-blue-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-guest:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #587dad;
+    /* Even darker blue */
+}
+
+/* Admin Logout Button Style */
+.admin-logout-btn {
+    color: white !important;
+    border: 2px solid white !important;
+    padding: 5px 15px !important;
+    border-radius: 20px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    transition: all 0.2s ease !important;
+    backface-visibility: hidden;
+}
+
+.admin-logout-btn:hover {
+    background-color: white !important;
+    color: var(--admin-pink) !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.admin-logout-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 /* Custom Bubbly Pink Button (Guest -> Login) */
@@ -836,7 +870,6 @@ input:focus {
         0 6px 15px rgba(0, 0, 0, 0.25),
         inset 0 2px 5px rgba(255, 255, 255, 0.5);
     background-color: #E082A8;
-}
 }
 
 .btn-guest:hover {

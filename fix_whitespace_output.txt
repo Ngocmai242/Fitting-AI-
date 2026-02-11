@@ -1,0 +1,20 @@
+=== Fixing Usernames with Whitespace ===
+
+User ID 2: Fullname has whitespace
+  Original: 'mai '
+  Trimmed: 'mai'
+User ID 5: Username has whitespace
+  Original: 'nga '
+  Trimmed: 'nga'
+User ID 5: Fullname has whitespace
+  Original: 'nga '
+  Trimmed: 'nga'
+
+✅ Fixed 2 users
+
+=== Current Users ===
+ID 2: 'mai' | 'ngongocmai242@gmail.com' | Role: USER
+ID 3: 'admin' | 'admin@gmail.com' | Role: ADMIN
+ID 4: 'mai123' | 'moonlightlonely242@gmail.com' | Role: ADMIN
+ID 5: 'nga' | 'nga242@gmail.com' | Role: USER
+ID 6: 'debugUser123' | 'debugUser123@example.com' | Role: USER

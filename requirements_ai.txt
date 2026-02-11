@@ -1,0 +1,10 @@
+playwright
+beautifulsoup4
+pandas
+opencv-python
+numpy
+flask
+torch
+torchvision
+Pillow
+requests

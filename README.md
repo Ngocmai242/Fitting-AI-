@@ -9,6 +9,7 @@ project/
 ├── backend/            # Python Flask App
 │   ├── app.py          # Server chính
 │   ├── requirements.txt # Các thư viện cần thiết
+│   └── server_dev.py   # Server cho môi trường dev (auto-reload)
 ├── frontend/           # Giao diện người dùng
 │   ├── index.html      # Trang chủ (Dashboard)
 │   ├── login.html      # Trang đăng nhập
@@ -16,109 +17,71 @@ project/
 │   ├── style.css       # Style Pastel Minimalism
 │   └── script.js       # Logic xử lý gọi API
 ├── database/           # Chứa cơ sở dữ liệu SQLite
-│   └── database.db     # Tự động tạo khi chạy app
+│   └── database_v2.db  # Tự động tạo khi chạy app
+├── package.json        # Quản lý script chạy song song (npm start)
 └── README.md           # Hướng dẫn sử dụng
 ```
 
-## Yêu cầu
+## Yêu cầu hệ thống
 
-- Python 3.7+
-- Trình duyệt web hiện đại (Chrome, Firefox, Edge)
+- **Python 3.7+**: Để chạy Backend.
+- **Node.js**: Để sử dụng `npm` quản lý các tiến trình song song.
 
-## Hướng dẫn cài đặt và chạy
+## Hướng dẫn cài đặt và chạy (Khuyên dùng)
 
-### 1. Chuẩn bị Backend
+Đây là cách hiện đại và tiện lợi nhất, giúp chạy cả Backend và Frontend chỉ với một lệnh duy nhất, hỗ trợ tự động tải lại (auto-reload) khi sửa code.
 
-Mở terminal (Command Prompt hoặc PowerShell) và di chuyển vào thư mục dự án:
+### 1. Cài đặt
+
+Mở terminal tại thư mục gốc của dự án và chạy các lệnh sau:
 
 ```bash
-# Cài đặt các thư viện cần thiết
+# 1. Cài đặt thư viện Python (Backend)
 pip install -r backend/requirements.txt
+
+# 2. Cài đặt thư viện Node.js (để chạy song song)
+npm install
 ```
 
-### 2. Khởi động Server
+### 2. Khởi động dự án
+
+Chỉ cần chạy một lệnh duy nhất:
 
 ```bash
-# Chạy backend server
-python backend/app.py
+npm start
 ```
 
-Server sẽ khởi động tại: `http://localhost:5000`
+Lệnh này sẽ:
+1.  Khởi động **Backend** (Python Flask) tại `http://localhost:8080`.
+    *   *Chế độ Debug được bật: Server sẽ tự động khởi động lại khi bạn sửa code Python.*
+2.  Khởi động **Frontend** (http-server) tại `http://localhost:5500`.
+3.  Tự động mở trình duyệt mặc định và truy cập vào trang web.
 
-*Lưu ý: Lần chạy đầu tiên, hệ thống sẽ tự động tạo file `database.db` trong thư mục `database/`.*
+---
 
-### 3. Chạy Frontend
+## Hướng dẫn chạy thủ công (Cách cũ)
 
-Vì frontend sử dụng HTML thuần giao tiếp với API, bạn chỉ cần mở file trực tiếp:
+Nếu bạn không muốn sử dụng Node.js, bạn có thể chạy thủ công từng thành phần:
 
-1. Vào thư mục `frontend`.
-2. click đúp vào file `login.html` (hoặc `index.html`) để mở trong trình duyệt.
-
-## Chạy trên GitHub Codespaces
-
-Dự án này đã được cấu hình sẵn để chạy trên GitHub Codespaces với file `.devcontainer/devcontainer.json`.
-
-### Bước 1: Tạo Codespace
-1. Truy cập: **https://github.com/Ngocmai242/Fitting-AI-**
-2. Nhấn vào nút **Code** (màu xanh lá cây).
-3. Chọn tab **Codespaces**.
-4. Nhấn **Create codespace on main** (hoặc **Open** nếu đã có Codespace).
-5. Đợi khoảng 1-2 phút để môi trường khởi tạo.
-
-### Bước 2: Khởi động Backend
-Khi Codespace đã mở xong, trong **Terminal** (Ctrl + ` hoặc View → Terminal), chạy:
-
-```bash
-# Cấp quyền thực thi cho script
-chmod +x start.sh
-
-# Chạy backend server
-./start.sh
-```
-
-**HOẶC** chạy trực tiếp:
-```bash
-python backend/run.py
-```
-
-**Lưu ý:** Backend sẽ chạy ở port **5050**. Bạn sẽ thấy thông báo:
-```
->>> Starting AuraFit Server on Port 5050...
-```
-
-### Bước 3: Mở Frontend với Live Server
-1. Trong Explorer sidebar bên trái, mở file **`frontend/login.html`** hoặc **`frontend/index.html`**.
-2. Click chuột phải vào file → chọn **"Open with Live Server"**.
-3. **HOẶC** nhấn nút **"Go Live"** ở thanh status bar (góc dưới phải màn hình).
-
-Live Server sẽ tự động mở frontend trong một **Simple Browser** hoặc tab mới.
-
-### Bước 4: Port Forwarding
-GitHub Codespaces sẽ tự động forward ports:
-- **Port 5050** - Backend API
-- **Port 5500** - Live Server (Frontend)
-
-Nếu có popup "A service is available on port...", nhấn **Open in Browser**.
-
-### Khắc phục lỗi
-**Lỗi: `python: can't open file 'backend/app.py'`**
-- ✅ **Giải pháp:** Chạy `python backend/run.py` thay vì `backend/app.py`
-
-**Lỗi: CORS hoặc không kết nối được API**
-- ✅ **Đã được sửa:** Code tự động phát hiện môi trường Codespaces và cho phép CORS.
-- Nếu vẫn lỗi, thử rebuild container: `Ctrl+Shift+P` → **"Codespaces: Rebuild Container"**
+1.  **Chạy Backend**:
+    *   Mở terminal, chạy: `python backend/server.py`
+    *   Server chạy tại: `http://localhost:8080`
+2.  **Chạy Frontend**:
+    *   Mở file `frontend/admin_login.html` (hoặc các file .html khác) trực tiếp bằng trình duyệt hoặc dùng Live Server của VSCode.
 
 ## Chức năng
 
 ### User Website:
-- **Đăng ký/Đăng nhập**: Tạo tài khoản an toàn (mật khẩu được mã hóa).
-- **AI Try-On**: Giả lập thử đồ (nhấn nút "Start Virtual Try-On" trên Dashboard).
-- **Gợi ý Outfit**: Xem danh sách các bộ đồ được đề xuất kèm link mua hàng.
+- **Đăng ký/Đăng nhập**: Tạo tài khoản an toàn.
+- **AI Try-On**: Giả lập thử đồ.
+- **Gợi ý Outfit**: Xem danh sách các bộ đồ được đề xuất.
 
 ### Admin Website:
 - **Đăng nhập**: Truy cập với tài khoản có quyền Admin.
-- **Dashboard**: Xem thống kê người dùng và kho dữ liệu outfit (giao diện ẩn sẽ hiện ra khi Admin đăng nhập).
+- **Dashboard**: Quản lý người dùng, sản phẩm.
 
-## Demo Credentials
-Để test nhanh, bạn có thể đăng ký một tài khoản mới.
-- Nếu đăng ký username là `admin`, hệ thống sẽ tự động cấp quyền **ADMIN** (dùng cho mục đích demo).
+## Tài khoản Demo
+- **User**: Đăng ký mới bất kỳ.
+- **Admin**:
+    - Username: `admin`
+    - Password: `admin`

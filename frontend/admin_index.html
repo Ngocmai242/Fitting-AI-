@@ -8,18 +8,28 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* Shared Text Shadow Class for White Text on Pastel */
-        /* Shared Text Shadow Class for White Text on Pastel */
+        /* Updated Darker Pastel Palette for Contrast with White Text */
+        :root {
+            --admin-bg: #f4f6f8;
+            --admin-pink: #d68c9e;
+            /* Solid Darker Pastel Pink */
+            --admin-blue: #7ba4cf;
+            /* Solid Darker Pastel Blue */
+            --admin-green: #81b888;
+            /* Solid Darker Pastel Green */
+            --admin-text-on-pastel: #ffffff;
+        }
+
         .white-text-shadow {
-            /* Medium Gray Outline + Drop Shadow */
-            text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 4px 8px rgba(0, 0, 0, 0.4);
+            text-shadow: none;
+            /* Removed shadow as requested "không gradient pastel đậm hơn sao cho nhìn rõ chữ trắng" - solid color is enough */
         }
 
         .admin-layout {
             display: flex;
             min-height: 100vh;
             padding-top: var(--nav-height);
-            background-color: #fdfdfd;
+            background-color: var(--admin-bg);
         }
 
         .sidebar {
@@ -39,8 +49,8 @@
             flex: 1;
             margin-left: 260px;
             padding: 2rem;
-            background: linear-gradient(135deg, rgba(255, 183, 197, 0.05), rgba(162, 210, 255, 0.05));
-            /* Very light pastel bg */
+            background: #fdfdfd;
+            /* Clean background */
         }
 
         .sidebar-menu a {
@@ -58,24 +68,25 @@
 
         .sidebar-menu a:hover,
         .sidebar-menu a.active {
-            /* Pastel Blue/Pink Gradient for Active/Hover */
-            background: linear-gradient(90deg, var(--pastel-blue), var(--pastel-pink));
-            color: white;
-            box-shadow: 0 4px 10px rgba(162, 210, 255, 0.4);
-            /* Medium Gray Outline */
-            text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 2px 4px rgba(0, 0, 0, 0.3);
+            /* Blue-Pink Gradient */
+            background: linear-gradient(135deg, var(--admin-blue), var(--admin-pink));
+            color: var(--admin-text-on-pastel);
+            box-shadow: 0 4px 10px rgba(123, 164, 207, 0.4);
+            text-shadow: none;
         }
 
         .sidebar-menu a:hover i,
         .sidebar-menu a.active i {
-            /* Icons are inside, inheriting color white is fine */
+            color: white;
+            /* Ensure icon turns white on active/hover */
         }
 
         .sidebar-menu i {
             width: 25px;
             text-align: center;
             margin-right: 10px;
-            color: var(--pastel-blue-dark);
+            color: var(--admin-blue);
+            /* Default to Blue */
             /* Default icon color */
         }
 
@@ -106,8 +117,8 @@
             padding: 1.5rem;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            /* Borders will be colored inline below or we can use classes */
-            border-left: 5px solid var(--pastel-pink);
+            /* Borders using new palette */
+            border-left: 5px solid var(--admin-pink);
         }
 
         .stat-card h3 {
@@ -130,7 +141,7 @@
             margin-right: 15px;
             font-weight: 700;
             font-size: 1.8rem;
-            background: linear-gradient(135deg, var(--pastel-blue), var(--pastel-pink));
+            background: linear-gradient(135deg, var(--admin-blue), var(--admin-pink));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -140,22 +151,212 @@
         .section-title {
             margin-bottom: 3rem !important;
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .action-btn {
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 5px 8px;
+            font-size: 1.1rem;
+            transition: 0.2s;
+        }
+
+        .action-btn.edit {
+            color: var(--admin-blue);
+        }
+
+        .action-btn.delete {
+            color: #e57373;
+            /* Slightly softer red */
+        }
+
+        .action-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Override Buttons for Admin to match new palette */
+        .btn-primary {
+            background-color: var(--admin-pink) !important;
+            color: white !important;
+        }
+
+        .btn-primary:hover {
+            background-color: #c4768b !important;
+            /* Slightly darker */
+        }
+
+        .btn-secondary {
+            background-color: var(--admin-blue) !important;
+            color: white !important;
+        }
+
+        .btn-secondary:hover {
+            background-color: #6a92bf !important;
+        }
+
+        /* Table Spacing & Alignment Fixes */
+        #product-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        #product-table th,
+        #product-table td {
+            padding: 15px 10px;
+            /* Vertical / Horizontal padding */
+            vertical-align: middle;
+        }
+
+        #product-table tbody tr:hover {
+            background-color: #fcfcfc;
+        }
+
+        /* User Management Styles */
+        .table-header-blue th {
+            background-color: var(--admin-blue) !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .row-hover-pink:hover {
+            background-color: #ffeef2 !important;
+            /* Light pink hover */
+        }
+
+        .badge-active {
+            background-color: var(--admin-green);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+        }
+
+        .badge-blocked {
+            background-color: var(--admin-pink);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+        }
+
+        .badge-role-admin {
+            background-color: var(--admin-pink);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        .badge-role-user {
+            background-color: var(--admin-blue);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        .badge-role-staff {
+            background-color: var(--admin-green);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        /* Search & Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            flex-wrap: wrap;
+        }
+
+        .filter-bar input,
+        .filter-bar select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .filter-bar input:focus,
+        .filter-bar select:focus {
+            border-color: var(--admin-blue);
+        }
     </style>
 </head>
 
 <body>
-    <!-- Navbar (Pastel Theme) -->
+    <!-- Navbar (Blue-Pink Gradient) -->
     <nav
-        style="background: linear-gradient(90deg, var(--pastel-blue-nav), var(--pastel-pink-nav)) !important; box-shadow: 0 4px 20px rgba(118, 169, 214, 0.2);">
-        <div class="logo"
-            style="color: white !important; text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 4px 8px rgba(0,0,0,0.4);">
+        style="background: linear-gradient(135deg, var(--admin-blue), var(--admin-pink)) !important; box-shadow: 0 4px 20px rgba(123, 164, 207, 0.3);">
+        <div class="logo" style="color: white !important; text-shadow: none;">
             AuraFit ADMIN</div>
         <div class="nav-links">
-            <span
-                style="color:white; margin-right:20px; font-weight:600; text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 4px 8px rgba(0,0,0,0.4);">Welcome,
+            <span style="color:white; margin-right:20px; font-weight:600; text-shadow: none;">Welcome,
                 Admin</span>
-            <a href="#" onclick="logout()"
-                style="color: white; border: 2px solid white; padding: 5px 15px; border-radius: 20px; font-weight:600; text-shadow: 1px 1px 0 #777, -1px 1px 0 #777, -1px -1px 0 #777, 1px -1px 0 #777, 0 2px 4px rgba(0,0,0,0.3);">Logout</a>
+            <a href="#" onclick="logout()" class="admin-logout-btn">Logout</a>
         </div>
     </nav>
 
@@ -171,6 +372,8 @@
                 <a href="#mapping" onclick="showAdminModule('mapping')"><i class="fas fa-link"></i> Mapping & Shop</a>
                 <a href="#ai" onclick="showAdminModule('ai')"><i class="fas fa-brain"></i> AI Recommendation</a>
                 <a href="#users" onclick="showAdminModule('users')"><i class="fas fa-users-cog"></i> User Management</a>
+                <a href="#admin-staff" onclick="showAdminModule('admin-staff')"><i class="fas fa-user-shield"></i> Admin
+                    Management</a>
             </div>
         </aside>
 
@@ -185,11 +388,11 @@
                         <p>Total Users</p>
                         <h3>1,250</h3>
                     </div>
-                    <div class="stat-card" style="border-color: var(--pastel-blue);">
+                    <div class="stat-card" style="border-color: var(--admin-blue);">
                         <p>Active Outfits</p>
                         <h3>456</h3>
                     </div>
-                    <div class="stat-card" style="border-color: var(--success);">
+                    <div class="stat-card" style="border-color: var(--admin-green);">
                         <p>Clicks Today</p>
                         <h3>3,402</h3>
                     </div>
@@ -203,30 +406,112 @@
 
             <!-- Products Module -->
             <div id="mod-products" class="admin-module hidden">
-                <h2 class="section-title" style="text-align: left;">Manage Outfits</h2>
+                <h2 class="section-title" style="text-align: left;">Manage Products (Crawler & Manual)</h2>
+
+                <!-- Manual Add Form -->
                 <div class="admin-card">
-                    <button class="btn btn-primary" style="width: auto; margin-bottom: 1rem;"><i
-                            class="fas fa-plus"></i> Add New Outfit</button>
-                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
-                        <thead>
-                            <tr style="border-bottom: 2px solid #f0f0f0;">
-                                <th style="padding: 10px;">ID</th>
-                                <th>Name</th>
-                                <th>Category</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="padding: 10px;">001</td>
-                                <td>Summer Floral Dress</td>
-                                <td>Dress</td>
-                                <td><button class="btn-sm">Edit</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <h3><i class="fas fa-plus-circle"></i> Add Product Manually</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <input type="text" id="manual-name" placeholder="Product Name" style="padding: 8px;">
+                        <input type="number" id="manual-price" placeholder="Price (VND)" style="padding: 8px;">
+                        <input type="text" id="manual-image" placeholder="Image URL" style="padding: 8px;">
+                        <input type="text" id="manual-link" placeholder="Shopee/Shop Link" style="padding: 8px;">
+                        <select id="manual-category" style="padding: 8px;">
+                            <option value="top">Top (Áo)</option>
+                            <option value="bottom">Bottom (Quần/Váy)</option>
+                            <option value="dress">Dress (Đầm)</option>
+                            <option value="accessory">Accessory (Phụ kiện)</option>
+                        </select>
+                        <select id="manual-style" style="padding: 8px;">
+                            <option value="Casual">Casual</option>
+                            <option value="Office">Office</option>
+                            <option value="Party">Party</option>
+                            <option value="Streetwear">Streetwear</option>
+                            <option value="Vintage">Vintage</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="addManualProduct()"
+                        style="margin-top: 15px; width: auto;">Save Product</button>
+                </div>
+
+                <div class="admin-card">
+                    <h3>Product List</h3>
+                    <button class="btn btn-secondary" onclick="loadProducts()"
+                        style="width: auto; margin-bottom: 1rem;"><i class="fas fa-sync"></i> Refresh List</button>
+
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;" id="product-table">
+                            <thead>
+                                <tr style="border-bottom: 2px solid #edeff2;">
+                                    <th style="width: 5%; text-align: center;">ID</th>
+                                    <th style="width: 10%; text-align: center;">Image</th>
+                                    <th style="width: 25%; padding-left: 15px;">Name</th>
+                                    <th style="width: 15%; color: var(--admin-pink); text-align: center;">Price</th>
+                                    <th style="width: 15%; color: var(--admin-blue); text-align: center;">Category</th>
+                                    <th style="width: 15%; color: var(--admin-green); text-align: center;">Link</th>
+                                    <th style="width: 15%; text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="product-table-body">
+                                <tr>
+                                    <td colspan="6" style="padding: 20px; text-align: center;">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Edit Product Modal -->
+                <div id="edit-product-modal" class="modal-overlay">
+                    <div class="modal-content">
+                        <h3 style="margin-top:0;">Edit Product</h3>
+                        <input type="hidden" id="edit-id">
+
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="edit-name">
+                        </div>
+                        <div class="form-group">
+                            <label>Price</label>
+                            <input type="number" id="edit-price">
+                        </div>
+                        <div class="form-group">
+                            <label>Image URL</label>
+                            <input type="text" id="edit-image">
+                        </div>
+                        <div class="form-group">
+                            <label>Link</label>
+                            <input type="text" id="edit-link">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="edit-category">
+                                <option value="Uncategorized">Select...</option>
+                                <option value="top">Top (Áo)</option>
+                                <option value="bottom">Bottom (Quần/Váy)</option>
+                                <option value="dress">Dress (Đầm)</option>
+                                <option value="accessory">Accessory (Phụ kiện)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Style</label>
+                            <select id="edit-style">
+                                <option value="Casual">Casual</option>
+                                <option value="Office">Office</option>
+                                <option value="Party">Party</option>
+                                <option value="Streetwear">Streetwear</option>
+                                <option value="Vintage">Vintage</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                            <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveEditedProduct()">Save Changes</button>
+                        </div>
+                    </div>
                 </div>
             </div>
+
 
             <!-- Crawl Module -->
             <div id="mod-crawl" class="admin-module hidden">
@@ -272,8 +557,256 @@
             <!-- Users Module -->
             <div id="mod-users" class="admin-module hidden">
                 <h2 class="section-title" style="text-align: left;">User Management</h2>
+
+                <!-- 1. Analytics -->
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <p>Total Users</p>
+                        <h3 id="stat-total-users">0</h3>
+                    </div>
+                    <div class="stat-card" style="border-left-color: var(--admin-blue);">
+                        <p>New Users (Month)</p>
+                        <h3 id="stat-new-users">0</h3>
+                    </div>
+                    <div class="stat-card" style="border-left-color: var(--admin-green);">
+                        <p>Active Users</p>
+                        <h3 id="stat-active-users">0</h3>
+                    </div>
+                    <div class="stat-card" style="border-left-color: var(--admin-pink);">
+                        <p>Blocked Users</p>
+                        <h3 id="stat-blocked-users">0</h3>
+                    </div>
+                </div>
+
+                <!-- 2. Search & Filter -->
+                <div class="filter-bar">
+                    <input type="text" id="user-search" placeholder="Search by Email, Username, ID..." style="flex: 2;">
+                    <select id="filter-role" style="flex: 1;">
+                        <option value="all">All</option>
+                        <option value="USER" selected>User</option>
+                    </select>
+                    <select id="filter-status" style="flex: 1;">
+                        <option value="all">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Blocked">Blocked</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="runUserFilter()">Filter</button>
+                    <button class="btn" onclick="resetUserFilter()" style="background: #eee;">Reset</button>
+                </div>
+
+                <!-- 3. User List Table -->
                 <div class="admin-card">
-                    <p>Manage User Roles and Access.</p>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;" id="user-table">
+                            <thead class="table-header-blue">
+                                <tr>
+                                    <th style="padding: 15px; border-top-left-radius: 8px;">Avatar</th>
+                                    <th>User ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Created Date</th>
+                                    <th style="border-top-right-radius: 8px; text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Pagination (Mock) -->
+                    <div style="display: flex; justify-content: flex-end; padding-top: 15px; gap: 10px;">
+                        <button class="btn" style="background: #eee; padding: 5px 10px;">&lt;</button>
+                        <button class="btn"
+                            style="background: var(--admin-blue); color: white; padding: 5px 10px;">1</button>
+                        <button class="btn" style="background: #eee; padding: 5px 10px;">2</button>
+                        <button class="btn" style="background: #eee; padding: 5px 10px;">&gt;</button>
+                    </div>
+                </div>
+
+                <!-- User Detail Modal -->
+                <div id="user-detail-modal" class="modal-overlay">
+                    <div class="modal-content" style="max-width: 700px;">
+                        <h3 style="color: var(--admin-blue); margin-top:0;">User Details</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <!-- Personal Info -->
+                            <div
+                                style="background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+                                <h4 style="color: var(--admin-pink); margin-bottom: 15px;"><i
+                                        class="fas fa-id-card"></i> Personal Info</h4>
+                                <div style="text-align: center; margin-bottom: 10px;">
+                                    <img id="detail-avatar" src=""
+                                        style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--admin-pink);">
+                                </div>
+                                <p><strong>ID:</strong> <span id="detail-id"></span></p>
+                                <p><strong>Name:</strong> <span id="detail-name"></span></p>
+                                <p><strong>Email:</strong> <span id="detail-email"></span></p>
+                                <p><strong>Role:</strong> <span id="detail-role"></span></p>
+                                <p><strong>Joined:</strong> <span id="detail-joined"></span></p>
+                                <p><strong>Last Login:</strong> <span id="detail-last-login">Today at 10:30 AM
+                                        (Mock)</span></p>
+                                <div style="margin-top: 10px;">
+                                    <button id="btn-reset-pass" class="btn"
+                                        style="background: #eee; width: 100%; font-size: 0.8rem;">Reset
+                                        Password</button>
+                                </div>
+                            </div>
+                            <!-- Behavior Info -->
+                            <div
+                                style="background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+                                <h4 style="color: var(--admin-green); margin-bottom: 15px;"><i
+                                        class="fas fa-chart-pie"></i> Activity & Behavior</h4>
+                                <p><i class="fas fa-camera" style="color: var(--admin-blue);"></i> AI Try-On Count:
+                                    <strong>12</strong>
+                                </p>
+                                <p><i class="fas fa-tshirt" style="color: var(--admin-pink);"></i> Outfits Tried:
+                                    <strong>45</strong>
+                                </p>
+                                <p><i class="fas fa-heart" style="color: red;"></i> Favorite Products:
+                                    <strong>8</strong>
+                                </p>
+                                <hr style="margin: 10px 0; border-top: 1px solid #eee;">
+                                <p><strong>Recent Activity:</strong></p>
+                                <ul style="font-size: 0.85rem; padding-left: 20px; color: #666;">
+                                    <li>Tried on "Basic Tee" (2 mins ago)</li>
+                                    <li>Saved "Floral Dress" (1 hour ago)</li>
+                                    <li>Logged in from IP 192.168.1.1</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                            <button id="btn-block-user" class="btn" onclick="toggleBlockUser()"
+                                style="background: var(--admin-pink); color: white;">Block User</button>
+                            <button class="btn btn-secondary" onclick="closeUserDetailModal()">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit User/Admin Modal (Updated) -->
+            <div id="edit-user-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <h3 style="color: var(--admin-blue); margin-top:0;">Edit Account Details</h3>
+                    <input type="hidden" id="edit-user-id">
+
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="edit-user-name">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="edit-user-username" title="Change login username">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="edit-user-email">
+                    </div>
+
+                    <div class="form-group">
+                        <label>New Password (Optional)</label>
+                        <input type="password" id="edit-user-password" placeholder="Leave blank to keep current">
+                    </div>
+
+                    <!-- Role Hidden or Fixed -->
+                    <input type="hidden" id="edit-user-role">
+
+                    <div class="form-group">
+                        <label>Status</label>
+                        <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <button type="button" id="btn-status-active" onclick="setEditStatus('Active')"
+                                style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #e0e0e0; background: white; font-weight: 600; color: #777; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i class="fas fa-check-circle"></i> Active
+                            </button>
+                            <button type="button" id="btn-status-blocked" onclick="setEditStatus('Blocked')"
+                                style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #e0e0e0; background: white; font-weight: 600; color: #777; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i class="fas fa-ban"></i> Blocked
+                            </button>
+                            <input type="hidden" id="edit-user-status">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                        <button class="btn btn-secondary" onclick="closeEditUserModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveEditedUser()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin / Staff Module -->
+            <div id="mod-admin-staff" class="admin-module hidden">
+                <h2 class="section-title" style="text-align: left;">Admin Management</h2>
+
+                <div class="admin-card">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <p style="margin: 0; color: #666;">Manage system administrators.</p>
+                        <button class="btn" onclick="openCreateAdminModal()"
+                            style="background: var(--admin-pink); color: white; box-shadow: 0 4px 10px rgba(214, 140, 158, 0.4);">
+                            <i class="fas fa-plus"></i> Create Admin
+                        </button>
+                    </div>
+
+                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                        <thead class="table-header-blue">
+                            <tr>
+                                <th style="padding: 15px; border-top-left-radius: 8px;">Name</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th style="border-top-right-radius: 8px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body">
+                            <!-- JS Injection -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Create Admin Modal -->
+                <div id="create-admin-modal" class="modal-overlay">
+                    <div class="modal-content">
+                        <h3 style="color: var(--admin-blue); margin-top: 0;">Create New Admin</h3>
+                        <form id="create-admin-form" onsubmit="event.preventDefault(); submitCreateAdmin();">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input type="text" id="new-admin-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Username (Unique)</label>
+                                <input type="text" id="new-admin-username" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email (Unique)</label>
+                                <input type="email" id="new-admin-email" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" id="new-admin-password" required placeholder="Initial password">
+                            </div>
+                            <div class="form-group">
+                                <label>Role</label>
+                                <input type="text" value="ADMIN" disabled style="background: #eee; color: #555;">
+                                <input type="hidden" id="new-admin-role" value="ADMIN">
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select id="new-admin-status">
+                                    <option value="Active">Active</option>
+                                    <option value="Blocked">Blocked</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                                <button type="button" class="btn" onclick="closeCreateAdminModal()"
+                                    style="background: #eee;">Cancel</button>
+                                <button type="submit" class="btn"
+                                    style="background: var(--admin-green); color: white;">Create</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -293,14 +826,536 @@
             document.getElementById('mod-' + modId).classList.remove('hidden');
 
             // Highlight menu
-            // Simple approach: find link with href ending in modId
             const links = document.querySelectorAll('.sidebar-menu a');
             for (let link of links) {
                 if (link.getAttribute('href') === '#' + modId) {
                     link.classList.add('active');
                 }
             }
+
+            // Load data if needed
+            if (modId === 'products') {
+                loadProducts();
+            } else if (modId === 'users') {
+                loadUsers();
+            } else if (modId === 'admin-staff') {
+                loadAdmins();
+            }
         }
+
+        // --- User Management Logic ---
+        let allUsers = [];
+
+        async function loadUsers() {
+            const tbody = document.getElementById('user-table-body');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Loading...</td></tr>';
+            try {
+                // Determine if we have a real endpoint, otherwise mock or fetch all
+                // Assuming /users endpoint exists in standard JSON server or API
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/users`);
+                if (res.ok) {
+                    allUsers = await res.json();
+                } else {
+                    // Fallback to mock if endpoint missing
+                    console.warn("API /users failed, using mock data for demo.");
+                    allUsers = [
+                        { id: 1, fullname: 'Ngoc Mai', username: 'ngocmai', email: 'mai@example.com', role: 'USER', status: 'Active', created_at: '2025-12-01', avatar: '' },
+                        { id: 2, fullname: 'Admin Master', username: 'admin', email: 'admin@aura.fit', role: 'ADMIN', status: 'Active', created_at: '2025-11-15', avatar: '' },
+                        { id: 3, fullname: 'Bad User', username: 'spammer', email: 'spam@test.com', role: 'USER', status: 'Blocked', created_at: '2026-01-10', avatar: '' }
+                    ];
+                }
+
+                renderUsers(allUsers.filter(u => u.role === 'USER'));
+                updateUserStats(allUsers);
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: red;">Error loading users</td></tr>';
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('user-table-body');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No users found</td></tr>';
+                return;
+            }
+
+            users.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = 'row-hover-pink';
+                tr.style.borderBottom = '1px solid #f0f0f0';
+
+                // Avatar default
+                const avatar = u.avatar || `https://ui-avatars.com/api/?name=${u.fullname || u.username}&background=random&color=fff`;
+                // Role Badge
+                let roleBadge = `<span class="badge-role-user">User</span>`;
+                if (u.role === 'ADMIN') roleBadge = `<span class="badge-role-admin">Admin</span>`;
+                if (u.role === 'STAFF') roleBadge = `<span class="badge-role-staff">Staff</span>`;
+
+                // Status Badge
+                let statusBadge = `<span class="badge-active">Active</span>`;
+                // If status field missing, default to Active. Check string.
+                if (u.status === 'Blocked' || u.status === 'Locked') {
+                    statusBadge = `<span class="badge-blocked">Blocked</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td style="padding: 15px;"><img src="${avatar}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;"></td>
+                    <td>${u.id}</td>
+                    <td>${u.fullname || u.username}</td>
+                    <td>${u.email || '-'}</td>
+                    <td>${roleBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td>${u.created_at || '2026-01-01'}</td>
+                    <td style="text-align: center;">
+                        <button class="action-btn" style="color: var(--admin-blue);" onclick="showUserDetail(${u.id})"><i class="fas fa-eye"></i></button>
+                        <button class="action-btn" style="color: var(--admin-green);" onclick="editUser(${u.id})"><i class="fas fa-edit"></i></button>
+                        <button class="action-btn delete" style="color: #e57373;" onclick="deleteUser(${u.id})"><i class="fas fa-minus-circle"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateUserStats(users) {
+            document.getElementById('stat-total-users').innerText = users.length;
+            const newUsers = users.filter(u => u.created_at && u.created_at.includes('2026-02')).length; // Mock logic
+            document.getElementById('stat-new-users').innerText = newUsers; // Mock
+
+            const active = users.filter(u => !u.status || u.status === 'Active').length;
+            document.getElementById('stat-active-users').innerText = active;
+
+            const blocked = users.filter(u => u.status === 'Blocked').length;
+            document.getElementById('stat-blocked-users').innerText = blocked;
+        }
+
+        // Filtering
+        function runUserFilter() {
+            const search = document.getElementById('user-search').value.toLowerCase();
+            const role = document.getElementById('filter-role').value;
+            const status = document.getElementById('filter-status').value;
+
+            const filtered = allUsers.filter(u => {
+                const matchSearch = (u.email && u.email.toLowerCase().includes(search)) ||
+                    (u.username && u.username.toLowerCase().includes(search)) ||
+                    (u.fullname && u.fullname.toLowerCase().includes(search)) ||
+                    String(u.id).includes(search);
+                // Force strict USER role for this table
+                const matchRole = u.role === 'USER' && (role === 'all' || u.role === role);
+                // Normalize status check
+                const uStatus = u.status || 'Active';
+                const matchStatus = status === 'all' || uStatus === status;
+
+                return matchSearch && matchRole && matchStatus;
+            });
+
+            renderUsers(filtered);
+        }
+
+        function resetUserFilter() {
+            document.getElementById('user-search').value = '';
+            document.getElementById('filter-role').value = 'all';
+            document.getElementById('filter-status').value = 'all';
+            renderUsers(allUsers);
+        }
+
+        // Details Modal
+        let currentUserDetailId = null;
+
+        function showUserDetail(id) {
+            const user = allUsers.find(u => u.id == id);
+            if (!user) return;
+            currentUserDetailId = id;
+
+            const modal = document.getElementById('user-detail-modal');
+            const avatar = user.avatar || `https://ui-avatars.com/api/?name=${user.fullname || user.username}`;
+
+            document.getElementById('detail-avatar').src = avatar;
+            document.getElementById('detail-id').innerText = user.id;
+            document.getElementById('detail-name').innerText = user.fullname || user.username;
+            document.getElementById('detail-email').innerText = user.email || 'N/A';
+            document.getElementById('detail-role').innerText = user.role || 'USER';
+            document.getElementById('detail-joined').innerText = user.created_at || 'Unknown';
+
+            // Update Block Button state
+            const btnBlock = document.getElementById('btn-block-user');
+            if (user.status === 'Blocked') {
+                btnBlock.innerText = 'Unblock User';
+                btnBlock.style.background = 'var(--admin-green)';
+            } else {
+                btnBlock.innerText = 'Block User';
+                btnBlock.style.background = 'var(--admin-pink)';
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeUserDetailModal() {
+            document.getElementById('user-detail-modal').classList.remove('active');
+        }
+
+        async function toggleBlockUser() {
+            const user = allUsers.find(u => u.id == currentUserDetailId);
+            if (!user) return;
+
+            const newStatus = user.status === 'Blocked' ? 'Active' : 'Blocked';
+            if (!confirm(`Are you sure you want to ${newStatus === 'Blocked' ? 'BLOCK' : 'UNBLOCK'} this user?`)) return;
+
+            try {
+                // API Call Mock - In real app, PATCH /users/:id
+                // const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/users/${user.id}`, ...);
+
+                // For demonstration, update local and mock save
+                user.status = newStatus;
+
+                // Try sending to server if it supports it
+                await fetch(`${window.APP_CONFIG.getApiUrl()}/users/${user.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                }).catch(e => console.warn("Backend might not support PATCH status yet"));
+
+                alert(`User ${newStatus === 'Blocked' ? 'Blocked' : 'Unblocked'} successfully!`);
+                closeUserDetailModal();
+                loadUsers(); // Refresh UI
+            } catch (e) {
+                alert('Error updating user status');
+            }
+        }
+
+        // --- Edit User Functionality (Updated) ---
+        function editUser(id) {
+            const user = allUsers.find(u => u.id == id);
+            if (!user) return;
+
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-user-name').value = user.fullname || user.username;
+            document.getElementById('edit-user-username').value = user.username || '';
+            document.getElementById('edit-user-email').value = user.email || '';
+            document.getElementById('edit-user-password').value = ''; // Reset password field
+
+            // Handle Role (Hidden)
+            document.getElementById('edit-user-role').value = user.role || 'USER';
+
+            // Handle Status UI
+            let status = user.status || 'Active';
+            if (status === 'Disabled') status = 'Blocked';
+            document.getElementById('edit-user-status').value = status;
+            setEditStatus(status);
+
+            document.getElementById('edit-user-modal').classList.add('active');
+        }
+
+        function setEditStatus(status) {
+            const btnActive = document.getElementById('btn-status-active');
+            const btnBlocked = document.getElementById('btn-status-blocked');
+            const inputEl = document.getElementById('edit-user-status');
+
+            inputEl.value = status;
+
+            if (status === 'Active') {
+                if (btnActive) {
+                    btnActive.style.borderColor = 'var(--admin-green)';
+                    btnActive.style.color = 'var(--admin-green)';
+                    btnActive.style.backgroundColor = '#e8f5e9';
+                }
+                if (btnBlocked) {
+                    btnBlocked.style.borderColor = '#e0e0e0';
+                    btnBlocked.style.color = '#777';
+                    btnBlocked.style.backgroundColor = 'white';
+                }
+            } else {
+                if (btnBlocked) {
+                    btnBlocked.style.borderColor = '#e57373';
+                    btnBlocked.style.color = '#e57373';
+                    btnBlocked.style.backgroundColor = '#ffebee';
+                }
+                if (btnActive) {
+                    btnActive.style.borderColor = '#e0e0e0';
+                    btnActive.style.color = '#777';
+                    btnActive.style.backgroundColor = 'white';
+                }
+            }
+        }
+
+        function closeEditUserModal() {
+            document.getElementById('edit-user-modal').classList.remove('active');
+        }
+
+        async function saveEditedUser() {
+            const id = document.getElementById('edit-user-id').value;
+            const fullname = document.getElementById('edit-user-name').value;
+            const username = document.getElementById('edit-user-username').value;
+            const email = document.getElementById('edit-user-email').value;
+            const password = document.getElementById('edit-user-password').value;
+            const role = document.getElementById('edit-user-role').value;
+            const status = document.getElementById('edit-user-status').value;
+
+            try {
+                // Determine logic: Patch to /users/:id
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/users/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fullname, username, email, role, status, password
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Account updated successfully');
+                    closeEditUserModal();
+                    // Refresh both lists to be safe
+                    loadUsers().then(() => {
+                        // If we are on admin tab, filter admins
+                        if (!document.getElementById('mod-admin-staff').classList.contains('hidden')) {
+                            loadAdmins();
+                        }
+                    });
+                } else {
+                    const data = await res.json();
+                    alert('Failed: ' + (data.message || 'Unknown error'));
+                }
+            } catch (e) {
+                console.warn(e);
+                alert('Error updating user.');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to DELETE this account? This action cannot be undone.')) return;
+
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/users/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    alert('Account deleted successfully');
+                    loadUsers().then(() => {
+                        if (!document.getElementById('mod-admin-staff').classList.contains('hidden')) loadAdmins();
+                    });
+                } else {
+                    alert('Failed to delete account');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error deleting account');
+            }
+        }
+
+        // --- Admin / Staff Logic ---
+        function loadAdmins() {
+            // Filter allUsers for ADMIN, STAFF, MODERATOR
+            // Or fetch specific endpoint if available
+            // If allUsers is empty, fetch first
+            if (allUsers.length === 0) loadUsers().then(() => filterAdmins());
+            else filterAdmins();
+        }
+
+        function filterAdmins() {
+            const admins = allUsers.filter(u => ['ADMIN'].includes(u.role));
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+
+            admins.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #f0f0f0';
+
+                // Status Badge
+                // Status Badge
+                let statusBadge = `<span class="badge-active">Active</span>`;
+                if (u.status === 'Disabled' || u.status === 'Blocked') {
+                    statusBadge = `<span class="badge-blocked" style="background:#e57373;">Blocked</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td style="padding: 15px;">${u.fullname || u.username}</td>
+                    <td>${u.username}</td>
+                    <td>${u.email}</td>
+                    <td><span class="badge-role-admin" style="background: var(--admin-pink)">${u.role}</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="text-align: center;">
+                        <button class="action-btn" style="color: var(--admin-green);" onclick="editUser(${u.id})"><i class="fas fa-edit"></i></button>
+                        <button class="action-btn delete" style="color: #e57373;" onclick="deleteUser(${u.id})"><i class="fas fa-minus-circle"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openCreateAdminModal() {
+            document.getElementById('create-admin-form').reset();
+            document.getElementById('create-admin-modal').classList.add('active');
+        }
+
+        function closeCreateAdminModal() {
+            document.getElementById('create-admin-modal').classList.remove('active');
+        }
+
+        async function submitCreateAdmin() {
+            const name = document.getElementById('new-admin-name').value;
+            const username = document.getElementById('new-admin-username').value;
+            const email = document.getElementById('new-admin-email').value;
+            const password = document.getElementById('new-admin-password').value;
+            const role = document.getElementById('new-admin-role').value;
+            const status = document.getElementById('new-admin-status').value;
+
+            // Simple validation
+            if (!name || !username || !password) { alert("Missing info"); return; }
+
+            try {
+                console.log("Creating Admin:", { username, email, fullname: name, role, status });
+
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username, password, email, fullname: name, role: role, status: status
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert('New Admin/Staff Created Successfully!');
+                    closeCreateAdminModal();
+                    loadUsers().then(loadAdmins);
+                } else {
+                    console.error("Create Failed:", data);
+                    alert('Failed: ' + (data.message || 'Unknown server error'));
+                }
+            } catch (e) {
+                console.error("Network/Client Error:", e);
+                alert('Error processing request: ' + e.message);
+            }
+        }
+
+
+        async function addManualProduct() {
+            const name = document.getElementById('manual-name').value;
+            const price = document.getElementById('manual-price').value;
+            const image = document.getElementById('manual-image').value;
+            const link = document.getElementById('manual-link').value;
+            const category = document.getElementById('manual-category').value;
+            const style = document.getElementById('manual-style').value;
+
+            if (!name || !price) {
+                alert('Name and Price are required!');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/products`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name, price: parseFloat(price), image, shopee_link: link, category, style
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Product added successfully!');
+                    // Clear inputs
+                    document.getElementById('manual-name').value = '';
+                    document.getElementById('manual-price').value = '';
+                    loadProducts(); // Refresh list
+                } else {
+                    alert('Failed to add product.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error adding product.');
+            }
+        }
+
+        // --- Edit & Delete Functions ---
+
+        async function deleteProduct(id) {
+            if (!confirm('Are you sure you want to delete this product?')) return;
+
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/products/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    loadProducts(); // Refresh list
+                } else {
+                    alert('Failed to delete product');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error deleting product');
+            }
+        }
+
+        async function openEditModal(id) {
+            try {
+                // Fetch details
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/products/${id}`);
+                const product = await res.json();
+
+                if (!res.ok) throw new Error('Product not found');
+
+                // Fill form
+                document.getElementById('edit-id').value = product.id;
+                document.getElementById('edit-name').value = product.name;
+                document.getElementById('edit-price').value = product.price;
+                document.getElementById('edit-image').value = product.image;
+                document.getElementById('edit-link').value = product.shopee_link;
+                document.getElementById('edit-category').value = product.category || 'Uncategorized';
+                // Also set style
+                const styleSelect = document.getElementById('edit-style');
+                if (styleSelect && product.style) styleSelect.value = product.style;
+
+                // Show Modal
+                document.getElementById('edit-product-modal').classList.add('active');
+
+            } catch (e) {
+                console.error(e);
+                alert('Could not load product details.');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-product-modal').classList.remove('active');
+        }
+
+        async function saveEditedProduct() {
+            const id = document.getElementById('edit-id').value;
+            const name = document.getElementById('edit-name').value;
+            const price = document.getElementById('edit-price').value;
+            const image = document.getElementById('edit-image').value;
+            const link = document.getElementById('edit-link').value;
+            const category = document.getElementById('edit-category').value;
+            const style = document.getElementById('edit-style').value;
+
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/products/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name, price: parseFloat(price), image, shopee_link: link, category, style
+                    })
+                });
+
+                if (res.ok) {
+                    closeEditModal();
+                    loadProducts();
+                    alert('Product updated!');
+                } else {
+                    alert('Failed to update product.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error updating product.');
+            }
+        }
+
+
+        let currentCrawledData = [];
 
         // Crawl Function
         async function startCrawl() {
@@ -319,6 +1374,7 @@
             logDiv.innerHTML = '> Ready to crawl...<br>';
             resultsDiv.style.display = 'none';
             resultsGrid.innerHTML = '';
+            currentCrawledData = [];
 
             function log(msg) {
                 logDiv.innerHTML += `> ${msg}<br>`;
@@ -348,19 +1404,43 @@
                     await new Promise(r => setTimeout(r, 500));
                     log('Downloading images...');
                     await new Promise(r => setTimeout(r, 500));
-                    log(`SUCCESS: Crawled ${data.count} items.`);
+                    log(`SUCCESS: Found ${data.count} items. Please review below.`);
 
-                    // Render Results
+                    // Store data for saving later
+                    currentCrawledData = data.products;
+
+                    // Render Results with Checkboxes
                     resultsDiv.style.display = 'block';
-                    data.products.forEach(prod => {
+
+                    // Add "Save Selected" Button if not exists
+                    let saveBtn = document.getElementById('btn-save-crawled');
+                    if (!saveBtn) {
+                        saveBtn = document.createElement('button');
+                        saveBtn.id = 'btn-save-crawled';
+                        saveBtn.className = 'btn btn-primary';
+                        saveBtn.innerText = 'Save Selected Products';
+                        saveBtn.style.marginTop = '1rem';
+                        saveBtn.onclick = saveCrawledProducts;
+                        resultsDiv.insertBefore(saveBtn, resultsGrid);
+                    }
+
+                    resultsGrid.innerHTML = '';
+                    data.products.forEach((prod, index) => {
                         const card = document.createElement('div');
                         card.className = 'stat-card';
                         card.style.padding = '1rem';
+                        card.style.position = 'relative';
+
                         card.innerHTML = `
+                            <div style="position: absolute; top: 10px; right: 10px;">
+                                <input type="checkbox" class="crawl-checkbox" data-index="${index}" checked style="transform: scale(1.5);">
+                            </div>
                             <img src="${prod.image}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">
                             <h4 style="font-size: 1rem; margin-bottom: 5px;">${prod.name}</h4>
-                            <p style="color: var(--pastel-pink-dark); font-weight: bold;">${prod.price.toLocaleString()} VND</p>
+                            <p style="color: var(--admin-pink); font-weight: bold;">${prod.price.toLocaleString()} VND</p>
                             <span style="font-size: 0.8rem; background: #eee; padding: 2px 8px; border-radius: 4px;">${prod.category}</span>
+                            <br>
+                            <a href="${prod.shopee_link}" target="_blank" style="font-size: 0.8rem; color: blue;">View Original</a>
                         `;
                         resultsGrid.appendChild(card);
                     });
@@ -374,6 +1454,46 @@
                 console.error(error);
                 log(`CRITICAL ERROR: ${error.message}`);
                 alert(`Request Failed: ${error.message}\nCheck logs.`);
+            }
+        }
+
+        async function saveCrawledProducts() {
+            const checkboxes = document.querySelectorAll('.crawl-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert("Please select at least one product to save.");
+                return;
+            }
+
+            const productsToSave = [];
+            checkboxes.forEach(cb => {
+                const index = cb.getAttribute('data-index');
+                if (currentCrawledData[index]) {
+                    productsToSave.push(currentCrawledData[index]);
+                }
+            });
+
+            if (!confirm(`Are you sure you want to save ${productsToSave.length} products?`)) return;
+
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/crawl/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ products: productsToSave })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message);
+                    // Hide results and clear logs
+                    document.getElementById('crawl-results').style.display = 'none';
+                    document.getElementById('crawl-logs').innerHTML = '> Ready to crawl...';
+                    loadProducts(); // Refresh main list
+                } else {
+                    alert(`Save Failed: ${data.message}`);
+                }
+            } catch (e) {
+                console.error(e);
+                alert(`Error saving products: ${e.message}`);
             }
         }
 

@@ -1,4 +1,6 @@
 playwright
+playwright-stealth
+nest-asyncio
 beautifulsoup4
 pandas
 opencv-python
@@ -8,3 +10,4 @@ torch
 torchvision
 Pillow
 requests
+curl_cffi

@@ -32,16 +32,81 @@ from .models import (
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
+# Import crawlers independently
 try:
-    from data_engine.crawler.shopee import crawl_shop_url
-    CRAWLER_AVAILABLE = True
+    from data_engine.crawler.shopee import crawl_shop_url as crawl_shopee
 except ImportError as e:
-    print(f"Warning: Could not import crawler: {e}. Ensure 'requests' is installed (pip install requests).")
-    CRAWLER_AVAILABLE = False
-    def crawl_shop_url(url, limit=50): return []
+    print(f"Could not import shopee crawler: {e}")
+    def crawl_shopee(url, limit=50): return []
+
+try:
+    from data_engine.crawler.lazada import crawl_lazada_shop_url as crawl_lazada
+except ImportError as e:
+    # Lazada is optional
+    def crawl_lazada(url, limit=50): return []
+
+CRAWLER_AVAILABLE = True # Always True now since we use requests
 
 
 main_bp = Blueprint('main', __name__)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Canonical clothing taxonomy (for AI training)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Map từ ai_category (FeatureExtractor) → (main_group, sub_category) theo schema bạn đưa
+CANONICAL_CLOTHING_MAP = {
+    # Tops
+    "Top_Tshirt": ("tops", "t_shirt"),
+    "Top_Shirt": ("tops", "shirt"),
+    "Top_Tanktop": ("tops", "tank_top"),
+    "Top_Croptop": ("tops", "crop_top"),
+    "Top_Polo": ("tops", "shirt"),
+    "Top_Sweater": ("tops", "sweater"),      # gồm cả hoodie/cardigan trong rules hiện tại
+    # Outerwear (xem như tops trong schema đơn giản)
+    "Outer_Blazer": ("tops", "blazer"),
+    "Outer_Jacket": ("tops", "jacket"),
+    "Outer_Coat": ("tops", "jacket"),
+    # Bottoms
+    "Bottom_Jeans": ("bottoms", "jeans"),
+    "Bottom_Formal_Trousers": ("bottoms", "trousers"),
+    "Bottom_Shorts": ("bottoms", "shorts"),
+    "Bottom_Jogger": ("bottoms", "trousers"),
+    "Bottom_Skirt": ("dresses_skirts", "skirt"),
+    "Bottom_LongSkirt": ("dresses_skirts", "skirt"),
+    # Dresses & one-piece
+    "Dress": ("dresses_skirts", "dress"),
+    "Jumpsuit": ("dresses_skirts", "dress"),
+    # Sets & sleepwear
+    "Set_Sleepwear": ("sleepwear_homewear", "pajama_set"),
+    "Matching_set": ("clothing_sets", "top_bottom_set"),
+}
+
+
+def map_to_canonical_clothing(ai_category: str, item_type_raw: str, shopee_cat: str | None = None):
+    """
+    Map từ taxonomy AI hiện tại (ai_category, item_type) sang schema CLOTHING-ONLY bạn mô tả.
+    Trả về (item_type_name, category_name) hoặc (None, None) nếu không map được.
+    """
+    key = (ai_category or "").strip()
+    if key in CANONICAL_CLOTHING_MAP:
+        return CANONICAL_CLOTHING_MAP[key]
+
+    # Fallback nhẹ theo item_type nếu cần mở rộng sau này
+    it = (item_type_raw or "").strip().lower()
+    if not it:
+        return None, None
+
+    if it == "top":
+        return "tops", "t_shirt"
+    if it == "bottom":
+        return "bottoms", "trousers"
+    if it == "dress":
+        return "dresses_skirts", "dress"
+    if it == "set":
+        return "clothing_sets", "top_bottom_set"
+
+    return None, None
 
 def get_or_create(model, defaults=None, **kwargs):
     instance = model.query.filter_by(**kwargs).first()
@@ -66,6 +131,27 @@ def serve_static(path):
 
 # --- API Routes ---
 
+@main_bp.route('/api/classify', methods=['POST'])
+def classify_by_name():
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'message': 'name required'}), 400
+    try:
+        from data_engine.feature_engine import FeatureExtractor
+        feats = FeatureExtractor.extract(name, '')
+        ai_category = feats.get('category', 'Other')
+        ai_item_type = feats.get('item_type', '')
+        it_name, sub_cat = map_to_canonical_clothing(ai_category=ai_category, item_type_raw=ai_item_type)
+        return jsonify({
+            'ai_item_type': ai_item_type,
+            'ai_category': ai_category,
+            'item_type': it_name,
+            'category': sub_cat
+        }), 200
+    except Exception as e:
+        return jsonify({'message': f'classification error: {e}'}), 500
+
 @main_bp.route('/api/register', methods=['POST'])
 def register():
     data = request.json
@@ -89,25 +175,28 @@ def register():
     try:
         hashed_pw = generate_password_hash(password)
         print(f"Password hashed successfully")
-        
+        desired_role = str(data.get('role', 'USER')).upper()
+        # Only allow creating non-USER roles if current session user is ADMIN
+        can_set_role = False
+        sid = session.get('user_id')
+        if sid:
+            admin_user = User.query.get(sid)
+            if admin_user and admin_user.role == 'ADMIN':
+                can_set_role = True
+        final_role = desired_role if (desired_role != 'USER' and can_set_role) else 'USER'
+
         new_user = User(
             username=username,
             email=email,
             phone=phone,
             password=hashed_pw,
-            role=data.get('role', 'USER'),
-            status=data.get('status', 'Active'),
+            role=final_role,
+            status='Active',
             fullname=data.get('fullname', username).strip(), # Use provided fullname or fallback to username
             avatar = f"https://ui-avatars.com/api/?name={username}&background=FF9EB5&color=fff",
             created_at=datetime.utcnow()
         )
-        
-        # Don't auto-promote to admin based on username
-        # Don't auto-promote to admin based on username
-        if username.lower() == 'admin':
-            new_user.role = 'ADMIN'
-            print(f"Setting role to ADMIN for user: admin")
-        
+                
         db.session.add(new_user)
         db.session.commit()
         
@@ -365,15 +454,19 @@ def crawl():
     if not shop_url:
         return jsonify({'message': 'Thiếu URL'}), 400
 
-    if not CRAWLER_AVAILABLE:
-        return jsonify({
-            'message': 'Crawler dependencies missing. Please run: pip install requests beautifulsoup4'
-        }), 500
+    # Component check (optional, since we use requests now)
+    pass 
 
     try:
-        # Gọi crawler
+        # Gọi crawler tương ứng
         current_app.logger.info(f"[CRAWL] Bắt đầu crawl: {shop_url}")
-        crawled_products = crawl_shop_url(shop_url, limit=50)
+        
+        if 'lazada.vn' in shop_url:
+            current_app.logger.info("Detect Lazada URL")
+            crawled_products = crawl_lazada(shop_url, limit=50)
+        else:
+            current_app.logger.info("Detect Shopee URL (or default)")
+            crawled_products = crawl_shopee(shop_url, limit=50)
         
         if not crawled_products:
             return jsonify({
@@ -414,7 +507,8 @@ def save_crawled_products():
     try:
         for item in products_to_save:
             item_id_value = item.get('itemid') or item.get('item_id') or item.get('itemId')
-            link_value = item.get('product_url') or item.get('shopee_link')
+            # Ưu tiên product_url, sau đó shopee_link, cuối cùng là url (từ crawler Shopee)
+            link_value = item.get('product_url') or item.get('shopee_link') or item.get('url')
 
             if not item_id_value and not link_value:
                 continue
@@ -458,8 +552,27 @@ def save_crawled_products():
             product.crawl_date = datetime.utcnow()
             product.is_active = True
 
-            item_type_name = (item.get('item_type') or item.get('category') or 'Other').strip() or 'Other'
-            category_name = (item.get('sub_category') or 'Other').strip() or 'Other'
+            # --- Category normalization for AI training ---
+            # Ưu tiên map sang CLOTHING-ONLY schema (tops/bottoms/dress/sets/sleepwear)
+            ai_category_val = (item.get('ai_category') or '').strip()
+            item_type_raw = (item.get('item_type') or '').strip()
+            sub_cat_raw = (item.get('sub_category') or '').strip()
+
+            item_type_name, category_name = map_to_canonical_clothing(
+                ai_category=ai_category_val,
+                item_type_raw=item_type_raw,
+                shopee_cat=item.get('category')
+            )
+
+            # Nếu không map được sang schema chuẩn → bỏ qua, tránh "phân loại khác"
+            if not item_type_name or not category_name:
+                continue
+
+            # Nếu sau chuẩn hóa vẫn còn "Other" hoặc Shopee leaf là "Khác" → bỏ qua sản phẩm này
+            vn_cat = str(category_name).strip().lower()
+            if vn_cat in ('other', 'khac', 'khác', 'phan loai khac', 'phân loại khác'):
+                continue
+
             color_name = (item.get('color') or 'Multicolor').strip() or 'Multicolor'
             color_tone = (item.get('color_tone') or 'Pattern').strip() or 'Pattern'
             style_name = (item.get('style') or 'Casual').strip() or 'Casual'

@@ -32,6 +32,8 @@
 
 ### **WORKFLOW 1: CRAWL DỮ LIỆU TỪ SHOPEE**
 
+**📎 Flow kỹ thuật chuẩn (Browser + Intercept JSON):** [SHOPEE_CRAWL_FLOW.md](SHOPEE_CRAWL_FLOW.md)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │               WORKFLOW CRAWL SHOPEE                        │
@@ -48,10 +50,12 @@
 │     │                                                       │
 │     ▼                                                       │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ Bước 2: Hệ thống truy cập Shopee                    │   │
-│  │ - Sử dụng proxy để tránh block                     │   │
-│  │ - Giả lập browser behavior                         │   │
-│  │ - Handle pagination                                │   │
+│  │ Bước 2: Hệ thống truy cập Shopee (xem SHOPEE_      │   │
+│  │         CRAWL_FLOW.md)                              │   │
+│  │ - Playwright: mở shop như user thật                 │   │
+│  │ - Intercept JSON (get_shop_base_v2, search_items,  │   │
+│  │   item/get) — không parse HTML, không reverse API  │   │
+│  │ - Pagination: scroll / search_items offset         │   │
 │  └─────────────────────────────────────────────────────┘   │
 │     │                                                       │
 │     ▼                                                       │

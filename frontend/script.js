@@ -102,16 +102,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await res.json();
 
+                // User portal: DO NOT allow Admin accounts to login here
                 if (data.role === 'ADMIN') {
-                    // Admin logging in via User Form -> Redirect to Admin Dashboard
-                    alert('Login Success! Welcome Admin. Redirecting to Dashboard...');
-                    localStorage.setItem('user', JSON.stringify(data));
-                    window.location.href = 'admin_index.html';
-                } else {
-                    alert('Login Success! Redirecting...');
-                    localStorage.setItem('user', JSON.stringify(data));
-                    window.location.href = 'index.html';
+                    alert('Access Denied: Please use the Admin Login page.');
+                    return;
                 }
+                alert('Login Success! Redirecting...');
+                localStorage.setItem('user', JSON.stringify(data));
+                window.location.href = 'index.html';
 
             } catch (err) {
                 console.error(err);

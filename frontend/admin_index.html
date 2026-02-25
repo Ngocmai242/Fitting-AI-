@@ -25,9 +25,14 @@
             /* Removed shadow as requested "không gradient pastel đậm hơn sao cho nhìn rõ chữ trắng" - solid color is enough */
         }
 
+        /* Remove global body padding-top from base stylesheet on this page
+           to tránh cộng dồn với .admin-layout (đang offset đúng bằng var(--nav-height)) */
+        body { padding-top: 0 !important; }
+
         .admin-layout {
             display: flex;
             min-height: 100vh;
+            /* giữ khoảng tránh cho fixed header */
             padding-top: var(--nav-height);
             background-color: var(--admin-bg);
         }
@@ -68,10 +73,9 @@
 
         .sidebar-menu a:hover,
         .sidebar-menu a.active {
-            /* Blue-Pink Gradient */
             background: linear-gradient(135deg, var(--admin-blue), var(--admin-pink));
             color: var(--admin-text-on-pastel);
-            box-shadow: 0 4px 10px rgba(123, 164, 207, 0.4);
+            box-shadow: 0 4px 10px rgba(123, 164, 207, 0.35);
             text-shadow: none;
         }
 
@@ -103,6 +107,29 @@
             /* Softer shadow */
             margin-bottom: 2rem;
             border: 1px solid rgba(162, 210, 255, 0.2);
+        }
+        
+        /* Responsive Admin Layout */
+        @media (max-width: 1200px) {
+            .sidebar { width: 220px; }
+            .main-admin-content { margin-left: 220px; }
+        }
+        @media (max-width: 992px) {
+            .sidebar { width: 200px; }
+            .main-admin-content { margin-left: 200px; padding: 1.5rem; }
+            .admin-card { padding: 1.2rem; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { width: 72px; padding: 1rem 0.5rem; }
+            .main-admin-content { margin-left: 72px; padding: 1rem; }
+            .sidebar-menu a { justify-content: center; padding: 10px; }
+            .sidebar-menu i { margin-right: 0; }
+            .sidebar-menu a span { display: none; }
+        }
+        @media (max-width: 480px) {
+            .main-admin-content { padding: 0.75rem; }
+            .stat-grid { grid-template-columns: 1fr; }
+            .admin-card { padding: 1rem; }
         }
 
         .stat-grid {
@@ -364,16 +391,13 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-menu">
-                <a href="#dashboard" class="active" onclick="showAdminModule('dashboard')"><i
-                        class="fas fa-chart-line"></i> Dashboard</a>
-                <a href="#products" onclick="showAdminModule('products')"><i class="fas fa-tshirt"></i> Outfit &
-                    Product</a>
-                <a href="#crawl" onclick="showAdminModule('crawl')"><i class="fas fa-spider"></i> Crawl Data</a>
-                <a href="#mapping" onclick="showAdminModule('mapping')"><i class="fas fa-link"></i> Mapping & Shop</a>
-                <a href="#ai" onclick="showAdminModule('ai')"><i class="fas fa-brain"></i> AI Recommendation</a>
-                <a href="#users" onclick="showAdminModule('users')"><i class="fas fa-users-cog"></i> User Management</a>
-                <a href="#admin-staff" onclick="showAdminModule('admin-staff')"><i class="fas fa-user-shield"></i> Admin
-                    Management</a>
+                <a href="#dashboard" class="active" onclick="showAdminModule('dashboard')"><i class="fas fa-chart-line"></i> <span>Dashboard</span></a>
+                <a href="#products" onclick="showAdminModule('products')"><i class="fas fa-tshirt"></i> <span>Outfit & Product</span></a>
+                <a href="#crawl" onclick="showAdminModule('crawl')"><i class="fas fa-spider"></i> <span>Crawl Data</span></a>
+                <a href="#mapping" onclick="showAdminModule('mapping')"><i class="fas fa-link"></i> <span>Mapping & Shop</span></a>
+                <a href="#ai" onclick="showAdminModule('ai')"><i class="fas fa-brain"></i> <span>AI Recommendation</span></a>
+                <a href="#users" onclick="showAdminModule('users')"><i class="fas fa-users-cog"></i> <span>User Management</span></a>
+                <a href="#admin-staff" onclick="showAdminModule('admin-staff')"><i class="fas fa-user-shield"></i> <span>Admin Management</span></a>
             </div>
         </aside>
 
@@ -1619,6 +1643,26 @@
                 category = rawCategory;
             }
 
+            // Auto classify from name if no explicit category selected
+            if (!rawCategory || rawCategory === 'Uncategorized') {
+                try {
+                    const clsRes = await fetch(`${window.APP_CONFIG.getApiUrl()}/classify`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    if (clsRes.ok) {
+                        const cls = await clsRes.json();
+                        if (cls && cls.item_type && cls.category) {
+                            category = cls.item_type;
+                            sub_category = cls.category;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Auto classify failed', e);
+                }
+            }
+
             try {
                 const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/products/${id}`, {
                     method: 'PUT',
@@ -1656,6 +1700,71 @@
                 const master = document.getElementById('select-all-crawled');
                 if (master) master.checked = !allChecked;
             }
+        }
+
+        // --- Category mapping for CRAWL PREVIEW (Shopee → core clothing categories) ---
+        const CRAWL_CATEGORY_CORE_MAP = {
+            // Tops
+            "Top_Tshirt": "t_shirt",
+            "Top_Shirt": "shirt",
+            "Top_Tanktop": "tank_top",
+            "Top_Croptop": "crop_top",
+            "Top_Polo": "shirt",
+            "Top_Sweater": "sweater",       // includes hoodie/knitwear/cardigan in current rules
+            "Outer_Blazer": "blazer",
+            "Outer_Jacket": "jacket",
+            "Outer_Coat": "jacket",
+
+            // Bottoms
+            "Bottom_Jeans": "jeans",
+            "Bottom_Formal_Trousers": "trousers",
+            "Bottom_Shorts": "shorts",
+            "Bottom_Jogger": "trousers",
+            "Bottom_Skirt": "skirt",
+            "Bottom_LongSkirt": "skirt",
+
+            // Dresses & one-piece
+            "Dress": "dress",
+            "Jumpsuit": "dress",
+
+            // Sets & sleepwear
+            "Matching_set": "top_bottom_set",
+            "Set_Sleepwear": "pajama_set"
+        };
+
+        function mapCrawlCategory(prod) {
+            const name = (prod.name || '').toLowerCase();
+            const itemType = (prod.item_type || '').toLowerCase();
+            const aiCat = (prod.ai_category || '').trim();
+
+            // Ưu tiên nhận diện "chân váy" để tránh ai_category=Dress (do từ khóa 'vay')
+            if (name.includes('chan vay') || name.includes('chân váy') || name.includes('skirt')) {
+                return 'skirt';
+            }
+
+            // Map trực tiếp từ AI category nếu có
+            if (aiCat && CRAWL_CATEGORY_CORE_MAP[aiCat]) {
+                return CRAWL_CATEGORY_CORE_MAP[aiCat];
+            }
+
+            // Fallback từ title (ưu tiên dress trước tops)
+            if (name.includes('dam') || name.includes('đầm') || name.includes('dress') || name.includes('váy liền') || name.includes('vay lien')) return 'dress';
+            if (name.includes('ao thun') || name.includes('t-shirt') || name.includes('tshirt')) return 't_shirt';
+            if (name.includes('so mi') || name.includes('shirt')) return 'shirt';
+            if (name.includes('hoodie')) return 'hoodie';
+            if (name.includes('ao len') || name.includes('sweater')) return 'sweater';
+            if (name.includes('khoac') || name.includes('jacket')) return 'jacket';
+            if (name.includes('pijama') || name.includes('đồ ngủ') || name.includes('pyjama')) return 'pajamas';
+            if (name.includes('bo do') || name.includes('set do') || name.includes('set đồ')) return 'top_bottom_set';
+
+            // Fallback theo item_type nếu AI đã biết nhóm lớn
+            if (itemType === 'top') return 't_shirt';
+            if (itemType === 'bottom') return 'trousers';
+            if (itemType === 'dress') return 'dress';
+            if (itemType === 'set') return 'top_bottom_set';
+
+            // Default an toàn: vẫn là 1 trong core categories
+            return 't_shirt';
         }
 
         // Crawl Function
@@ -1721,10 +1830,11 @@
 
                     data.products.forEach((prod, index) => {
                         const imgUrl = prod.image_url || prod.image || 'https://via.placeholder.com/50';
-                        const productLink = prod.product_url || '#';
+                        // Ưu tiên product_url, sau đó url (từ crawler), cuối cùng là shopee_link
+                        const productLink = prod.product_url || prod.url || prod.shopee_link || '#';
                         const priceDisplay = prod.price ? prod.price.toLocaleString() + ' VND' : '0 VND';
-                        const categoryDisplay = prod.category || prod.item_type || 'Uncategorized';
-                        const subCatDisplay = prod.sub_category ? ` / ${prod.sub_category}` : '';
+                        // Map về core clothing categories bạn định nghĩa (t_shirt, jeans, dress, ...)
+                        const categoryDisplay = mapCrawlCategory(prod);
                         const displayName = prod.name && prod.name.length > 60 ? prod.name.substring(0, 60) + '...' : (prod.name || 'Unnamed');
 
                         const tr = document.createElement('tr');
@@ -1733,7 +1843,7 @@
                     <td style="text-align: center; padding: 10px;"><input type="checkbox" class="crawl-checkbox" data-index="${index}" checked style="transform: scale(1.3); cursor: pointer;"></td>
                     <td style="text-align: center; padding: 10px;"><img src="${imgUrl}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px;" onerror="this.src='https://via.placeholder.com/50'"></td>
                     <td style="padding: 10px; font-weight: 500;" title="${prod.name || ''}">${displayName}</td>
-                    <td style="text-align: center; padding: 10px;"><span style="background: #e3f2fd; color: var(--admin-blue); padding: 4px 10px; border-radius: 12px;">${categoryDisplay}${subCatDisplay}</span></td>
+                    <td style="text-align: center; padding: 10px;"><span style="background: #e3f2fd; color: var(--admin-blue); padding: 4px 10px; border-radius: 12px;">${categoryDisplay}</span></td>
                     <td style="text-align: center; padding: 10px; color: var(--admin-pink); font-weight: 700;">${priceDisplay}</td>
                     <td style="text-align: center; padding: 10px;"><a href="${productLink}" target="_blank" style="color: var(--admin-blue);"><i class="fas fa-external-link-alt"></i></a></td>
                 `;
@@ -1817,6 +1927,7 @@
                 // alert('Access Denied: Admin Rights Required'); // Removed annoying alert
                 window.location.replace('admin_login.html');
             }
+            // Optional: could update welcome text in header in future if dynamic needed
         });
     </script>
 </body>

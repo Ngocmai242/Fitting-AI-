@@ -18,38 +18,41 @@ def _normalize(text: str) -> str:
 
 ITEM_CATEGORY_RULES: List[Dict[str, object]] = [
     # 1. One-piece & Sets (High Priority for AI Outfit Training)
-    {"item_type": "One-piece", "category": "Dress", "keywords": ["vay", "dam", "dress", "sundress", "maxi", "midi", "vay xoe", "vay suong", "dam thiet ke", "dam body", "vay body", "vay hoa", "dam suong", "dam du tiec"]},
-    {"item_type": "Set", "category": "Set_Sleepwear", "keywords": ["pijama", "do ngu", "bo ngu", "bongu", "ngu nu", "ngu nam", "set ngu", "mac nha", "vay ngu", "vayngu", "pyjama", "ao ngu", "do mac nha", "bo ngu lụa"]},
-    {"item_type": "Set", "category": "Matching_set", "keywords": ["set do", "do bo", "dobo", "matching set", "combo", "nguyen bo", "set quan", "set vay", "bo quan ao", "set trang phuc", "bo cotton", "set he", "set bo", "set nu", "set khoac", "set vest", "set ao quan"]},
-    {"item_type": "One-piece", "category": "Jumpsuit", "keywords": ["jumpsuit", "do bay", "jum"]},
+    {"item_type": "dress", "category": "Dress", "keywords": ["vay", "dam", "dress", "vay lien", "vay lien than", "sundress", "maxi", "midi", "vay xoe", "vay suong", "dam thiet ke", "dam body", "vay body", "vay hoa", "dam suong", "dam du tiec"]},
+    {"item_type": "set", "category": "Set_Sleepwear", "keywords": ["pijama", "do ngu", "bo ngu", "bongu", "ngu nu", "ngu nam", "set ngu", "mac nha", "vay ngu", "vayngu", "pyjama", "ao ngu", "do mac nha", "bo ngu lụa"]},
+    {"item_type": "set", "category": "Matching_set", "keywords": ["set do", "do bo", "dobo", "matching set", "combo", "nguyen bo", "set quan", "set vay", "bo quan ao", "set trang phuc", "bo cotton", "set he", "set bo", "set nu", "set khoac", "set vest", "set ao quan"]},
+    {"item_type": "dress", "category": "Jumpsuit", "keywords": ["jumpsuit", "do bay", "jum"]},
     
     # 2. Outerwear
-    {"item_type": "Outerwear", "category": "Outer_Blazer", "keywords": ["blazer", "ao blazer", "ao vest", "vest"]},
-    {"item_type": "Outerwear", "category": "Outer_Jacket", "keywords": ["jacket", "ao khoac", "khoac ngoai", "ao gio", "windbreaker", "ao phao", "denim jacket", "jean jacket", "bomber", "ao khoac bomber", "ao jacket"]},
-    {"item_type": "Outerwear", "category": "Outer_Coat", "keywords": ["coat", "ao mang to", "ao da", "mang to", "da ep", "da cuu", "da long"]},
+    {"item_type": "outerwear", "category": "Outer_Blazer", "keywords": ["blazer", "ao blazer", "ao vest", "vest"]},
+    {"item_type": "outerwear", "category": "Outer_Jacket", "keywords": ["jacket", "ao khoac", "khoac ngoai", "ao gio", "windbreaker", "ao phao", "denim jacket", "jean jacket", "bomber", "ao khoac bomber", "ao jacket"]},
+    {"item_type": "outerwear", "category": "Outer_Coat", "keywords": ["coat", "ao mang to", "ao da", "mang to", "da ep", "da cuu", "da long"]},
     
     # 3. Tops
-    {"item_type": "Top", "category": "Top_Tshirt", "keywords": ["ao thun", "t-shirt", "tshirt", "tee", "ao phong", "shirt tay ngan", "thun tam", "form rong"]},
-    {"item_type": "Top", "category": "Top_Croptop", "keywords": ["crop", "croptop", "cropped", "ao ngan", "ao ho eo", "baby tee", "tre vai"]},
-    {"item_type": "Top", "category": "Top_Shirt", "keywords": ["so mi", "shirt", "button down", "ao so mi", "somi", "co duc"]},
-    {"item_type": "Top", "category": "Top_Tanktop", "keywords": ["tank", "ba lo", "sat nach", "2 day", "hai day", "camisole", "ao day", "day trang", "ong", "ao quay"]},
-    {"item_type": "Top", "category": "Top_Sweater", "keywords": ["sweater", "ao len", "ao ni", "len tam", "giu nhiet", "det kim", "hoodie", "cardigan"]},
+    {"item_type": "top", "category": "Top_Tshirt", "keywords": ["ao thun", "t-shirt", "tshirt", "tee", "ao phong", "basic tee", "cotton tee", "oversize tee", "form rong"]},
+    {"item_type": "top", "category": "Top_Croptop", "keywords": ["crop", "croptop", "cropped", "ao ngan", "ao ho eo", "baby tee", "tre vai"]},
+    {"item_type": "top", "category": "Top_Shirt", "keywords": ["so mi", "shirt", "button down", "ao so mi", "somi", "co duc"]},
+    {"item_type": "top", "category": "Top_Polo", "keywords": ["ao polo", "polo", "polo shirt", "co be", "ao thun co be"]},
+    {"item_type": "top", "category": "Top_Tanktop", "keywords": ["tank", "ba lo", "sat nach", "2 day", "hai day", "camisole", "ao day", "day trang", "ong", "ao quay"]},
+    {"item_type": "top", "category": "Top_Sweater", "keywords": ["hoodie", "ao hoodie", "sweater", "ao len", "ao ni", "len tam", "giu nhiet", "det kim", "cardigan", "pullover"]},
     
     # 4. Bottoms
-    {"item_type": "Bottom", "category": "Bottom_Formal_Trousers", "keywords": ["quan tay", "quan au", "formal pant", "quần tây"]},
-    {"item_type": "Bottom", "category": "Bottom_Jeans", "keywords": ["jean", "denim", "quan bo", "quan jean", "wide leg", "skinny"]},
-    {"item_type": "Bottom", "category": "Bottom_Shorts", "keywords": ["short", "quan dui", "quan ngo", "quandui"]},
-    {"item_type": "Bottom", "category": "Bottom_Skirt", "keywords": ["chan vay", "skirt", "vay dai", "vay chu a", "chan vay dai", "mini skirt"]},
+    {"item_type": "bottom", "category": "Bottom_Formal_Trousers", "keywords": ["quan tay", "quan au", "formal pant", "quần tây"]},
+    {"item_type": "bottom", "category": "Bottom_Jeans", "keywords": ["jean", "denim", "quan bo", "quan jean", "wide leg", "skinny"]},
+    {"item_type": "bottom", "category": "Bottom_Shorts", "keywords": ["short", "quan dui", "quan ngo", "quandui"]},
+    {"item_type": "bottom", "category": "Bottom_Jogger", "keywords": ["jogger", "quan jogger", "bo gau", "quan the thao bo", "sweatpants"]},
+    {"item_type": "bottom", "category": "Bottom_Skirt", "keywords": ["chan vay", "skirt", "vay chu a", "mini skirt", "vay tennis", "vay xep ly"]},
+    {"item_type": "bottom", "category": "Bottom_LongSkirt", "keywords": ["vay dai", "maxi skirt", "vay midi", "vay dai qua goi"]},
     
     # 5. Footwear
-    {"item_type": "Footwear", "category": "Footwear_Loafers", "keywords": ["loafer", "penny", "giay luoi", "giày lười"]},
-    {"item_type": "Footwear", "category": "Footwear_Sneakers", "keywords": ["sneaker", "giay the thao", "giay bata"]},
-    {"item_type": "Footwear", "category": "Footwear_Heels", "keywords": ["cao got", "high heel", "guoc"]},
-    {"item_type": "Footwear", "category": "Footwear_Sandals", "keywords": ["sandal", "xang dan", "dep quai", "le"]},
+    {"item_type": "shoes", "category": "Footwear_Loafers", "keywords": ["loafer", "penny", "giay luoi", "giày lười"]},
+    {"item_type": "shoes", "category": "Footwear_Sneakers", "keywords": ["sneaker", "giay the thao", "giay bata"]},
+    {"item_type": "shoes", "category": "Footwear_Heels", "keywords": ["cao got", "high heel", "guoc"]},
+    {"item_type": "shoes", "category": "Footwear_Sandals", "keywords": ["sandal", "xang dan", "dep quai", "le"]},
     
     # 6. Accessories
-    {"item_type": "Accessories", "category": "Acc_Bag", "keywords": ["tui", "bag", "tui xach", "tui deo"]},
-    {"item_type": "Accessories", "category": "Acc_Hat", "keywords": ["mu", "non", "hat", "cap"]},
+    {"item_type": "bag", "category": "Acc_Bag", "keywords": ["tui", "bag", "tui xach", "tui deo"]},
+    {"item_type": "accessory", "category": "Acc_Hat", "keywords": ["mu", "non", "hat", "cap"]},
 ]
 
 COLOR_RULES: Dict[str, List[str]] = {
@@ -257,21 +260,34 @@ class FeatureExtractor:
     @staticmethod
     def _map_category_by_keywords(name: str, shopee_cat: str) -> str:
         """Specific mapping for AI outfit training as requested by user."""
-        rules = {
-            'pijama': 'Set_Sleepwear',
-            'do ngu': 'Set_Sleepwear',
-            'loafer': 'Footwear_Loafers',
-            't-shirt': 'Top_Tshirt',
-            'ao thun': 'Top_Tshirt',
-            'quan tay': 'Bottom_Formal_Trousers',
-            'vay': 'Dress',
-            'dam': 'Dress',
-            'blazer': 'Outer_Blazer',
-            'hoodie': 'Top_Sweater'
-        }
-        
+        # Evaluate longer, more specific keywords first to avoid over-matching (e.g., "chan vay" vs "vay")
+        keyword_pairs = [
+            ('chan vay', 'Bottom_Skirt'),
+            ('skirt', 'Bottom_Skirt'),
+            ('vay dai', 'Bottom_LongSkirt'),
+            ('maxi skirt', 'Bottom_LongSkirt'),
+            ('vay midi', 'Bottom_LongSkirt'),
+            ('pijama', 'Set_Sleepwear'),
+            ('do ngu', 'Set_Sleepwear'),
+            ('loafer', 'Footwear_Loafers'),
+            ('t-shirt', 'Top_Tshirt'),
+            ('ao thun', 'Top_Tshirt'),
+            ('ao polo', 'Top_Polo'),
+            ('polo', 'Top_Polo'),
+            ('co be', 'Top_Polo'),
+            ('quan tay', 'Bottom_Formal_Trousers'),
+            ('jogger', 'Bottom_Jogger'),
+            ('dam', 'Dress'),
+            ('vay', 'Dress'),
+            ('blazer', 'Outer_Blazer'),
+            ('hoodie', 'Top_Sweater'),
+        ]
+
+        # Sort by keyword length descending to prefer more specific phrases
+        keyword_pairs.sort(key=lambda kv: len(kv[0]), reverse=True)
+
         name_lower = name.lower()
-        for key, val in rules.items():
+        for key, val in keyword_pairs:
             if key in name_lower:
                 return val
         
@@ -283,14 +299,38 @@ class FeatureExtractor:
 
     @staticmethod
     def _detect_item_and_category(text: str) -> Tuple[str, str]:
-        # Chuẩn hóa khoảng trắng để matching chính xác
         text = f" {text} "
-        for rule in ITEM_CATEGORY_RULES:
-            keywords = rule["keywords"] # type: ignore
+        candidates: List[Tuple[int, int, int, str, str, str]] = []
+        for idx, rule in enumerate(ITEM_CATEGORY_RULES):
+            keywords = rule["keywords"]  # type: ignore
             for kw in keywords:
-                # Đảm bảo match từ khóa có khoảng trắng xung quanh hoặc là substring hợp lệ
-                if f" {kw} " in text or (len(kw) > 5 and kw in text):
-                    return str(rule["item_type"]), str(rule["category"])
+                if (f" {kw} " in text) or (len(kw) > 5 and kw in text):
+                    cat = str(rule["category"])
+                    it = str(rule["item_type"])
+                    # Tier priority
+                    if cat in ("Dress", "Jumpsuit", "Set_Sleepwear", "Matching_set"):
+                        tier = 1
+                    elif cat.startswith("Outer_"):
+                        tier = 2
+                    elif cat.startswith("Bottom_"):
+                        tier = 3
+                    elif cat.startswith("Top_"):
+                        tier = 4
+                    else:
+                        tier = 5
+                    candidates.append((tier, -len(kw), idx, it, cat, kw))
+        if candidates:
+            for _, _, _, it, cat, kw in candidates:
+                if cat == "Bottom_Skirt" and (kw == "chan vay" or kw == "skirt" or "chan vay" in kw):
+                    return it, cat
+            for _, _, _, it, cat, kw in candidates:
+                if cat == "Top_Sweater" and ("hoodie" in kw):
+                    return it, cat
+            for _, _, _, it, cat, kw in candidates:
+                if cat == "Bottom_LongSkirt" and ("vay midi" in kw or "vay dai" in kw or "maxi skirt" in kw):
+                    return it, cat
+            tier, neglen, idx, it, cat, kw = sorted(candidates)[0]
+            return it, cat
         return "Other", "Other"
 
     @staticmethod

@@ -283,6 +283,17 @@ nav .logo {
     color: var(--pastel-pink-dark);
 }
 
+/* Make the user dropdown escape the nav scroll container on small screens */
+@media (max-width: 768px) {
+    .dropdown-menu {
+        position: fixed;
+        top: var(--nav-height);
+        right: 10px;
+        width: 220px;
+        z-index: 2001;
+    }
+}
+
 /* Nav Overrides */
 .nav-cta-btn {
     background: white !important;
@@ -311,7 +322,7 @@ nav .logo {
     width: 100%;
     margin: 0;
     padding: 0;
-    height: 70vh;
+    height: 66vh;
     /* Changed to 70% section height */
     overflow: hidden;
 }
@@ -848,40 +859,36 @@ input:focus {
 
 /* Custom Bubbly Pink Button (Guest -> Login) */
 .btn-bubble-pink {
-    background-color: #EF93B6;
-    /* Stronger Pink to match image e.g. Logout button background */
-    color: white !important;
-    font-weight: 800 !important;
-    font-size: 1rem !important;
-    padding: 8px 24px !important;
-    border-radius: 30px !important;
-    border: 3px solid white !important;
-    /* Thick white border */
-    box-shadow:
-        0 4px 10px rgba(0, 0, 0, 0.2),
-        inset 0 2px 5px rgba(255, 255, 255, 0.4);
-    /* Inner shine */
-    text-shadow:
-        2px 2px 0px rgba(0, 0, 0, 0.2),
-        /* Drop shadow for text */
-        -1px -1px 0 rgba(0, 0, 0, 0.1);
-    /* Slight outline feel */
+    background: transparent !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    padding: 6px 16px !important;
+    border-radius: 20px !important;
+    border: 2px solid #ffffff !important;
     text-decoration: none !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s, box-shadow 0.2s;
-    font-family: 'Outfit', sans-serif;
-    letter-spacing: 0.5px;
-    height: auto;
+    transition: all 0.2s ease !important;
+    box-shadow: none;
 }
 
 .btn-bubble-pink:hover {
+    background-color: #ffffff !important;
+    color: var(--pastel-pink-dark) !important;
     transform: scale(1.05);
-    box-shadow:
-        0 6px 15px rgba(0, 0, 0, 0.25),
-        inset 0 2px 5px rgba(255, 255, 255, 0.5);
-    background-color: #E082A8;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-bubble-pink:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.btn-bubble-pink:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
 }
 
 .btn-guest:hover {
@@ -1241,4 +1248,94 @@ input:focus {
 .required {
     color: var(--error);
     margin-left: 3px;
+}
+
+/* =========================
+   Responsive: User Website
+   Breakpoints: 1200 / 992 / 768 / 576
+   ========================= */
+
+@media (max-width: 1200px) {
+    .hero-carousel-section { height: 60vh; }
+    .slide-overlay h2 { font-size: 2.6rem; }
+}
+
+@media (max-width: 992px) {
+    .nav-links { gap: 1rem; }
+    .nav-links a { font-size: 0.9rem; padding: 0.4rem 0.6rem; }
+    .nav-dropdown { width: 220px; }
+
+    .hero-carousel-section { height: 52vh; }
+    .slide-overlay { left: 8%; max-width: 520px; }
+    .slide-overlay h2 { font-size: 2.2rem; }
+    .slide-overlay p { font-size: 1rem; }
+    .slide-cta { padding: 8px 18px; }
+
+    .tool-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+    :root { --nav-height: 60px; }
+    nav { padding: 0 1rem; }
+    .nav-links { 
+        gap: 0.5rem; 
+        overflow-x: auto; 
+        flex-wrap: nowrap; 
+        -webkit-overflow-scrolling: touch;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+    .nav-links a, .nav-item-container > a { 
+        white-space: nowrap; 
+        flex: 0 0 auto; 
+    }
+    /* Hide text, switch to icons when space is tight */
+    .nav-item-container > a span, .nav-links a span { display: none; }
+    .nav-links a[href="#home"]::before {
+        font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\uf015"; margin-right: 6px;
+    }
+    .nav-item-container a[href="#tryon"]::before {
+        font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\uf553"; margin-right: 6px;
+    }
+    .nav-item-container a[href="#analysis"]::before {
+        font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\uf0eb"; margin-right: 6px;
+    }
+    .nav-item-container a[href="#tools"]::before {
+        font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\uf0d0"; margin-right: 6px;
+    }
+    .nav-item-container a[href="#shop"]::before {
+        font-family: "Font Awesome 6 Free"; font-weight: 900; content: "\uf290"; margin-right: 6px;
+    }
+
+    .hero-carousel-section { height: 46vh; }
+    .carousel-btn { width: 38px; height: 38px; font-size: 0.9rem; }
+    .slide-overlay { left: 6%; max-width: 420px; }
+    .slide-overlay h2 { font-size: 1.9rem; }
+    .slide-overlay p { font-size: 0.95rem; }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr) !important; gap: 14px !important; }
+    .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 14px !important; }
+    .ai-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 1.5rem !important; }
+
+    .card img { height: 160px; }
+    .cta-banner { padding: 2rem 1rem; }
+}
+
+@media (max-width: 576px) {
+    .nav-links { overflow-x: auto; flex-wrap: nowrap; gap: 0.5rem; }
+    .nav-links a { font-size: 0.85rem; padding: 0.4rem 0.6rem; }
+    .user-menu { margin-left: 6px; }
+    .nav-avatar { width: 34px; height: 34px; }
+
+    .hero-carousel-section { height: 42vh; }
+    .slide-overlay { left: 5%; max-width: 80%; }
+    .slide-overlay h2 { font-size: 1.6rem; }
+    .slide-overlay p { font-size: 0.9rem; }
+    .slide-cta { padding: 7px 16px; font-size: 0.85rem; }
+
+    .feature-grid { grid-template-columns: 1fr !important; }
+    .shop-grid { grid-template-columns: 1fr !important; }
+    .tool-grid { grid-template-columns: repeat(2, 1fr); }
+
+    #profile-view .profile-card { padding: 1.5rem; }
+    .profile-header-section { gap: 1rem; }
 }

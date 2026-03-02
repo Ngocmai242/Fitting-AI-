@@ -27,6 +27,11 @@ from .models import (
     Style,
     User,
 )
+from .ai.pose import extract_keypoints
+from .ai.features import compute_ratios, estimate_gender
+from .ai.classifier import predict_shape, predict_shape_with_confidence
+from .ai.image_tools import remove_background_rgba, recolor_clothing, upscale_image
+import json as _json
 
 # Add project root to path to import data_engine
 import sys
@@ -152,6 +157,87 @@ def classify_by_name():
     except Exception as e:
         return jsonify({'message': f'classification error: {e}'}), 500
 
+@main_bp.route('/api/analyze-proportion', methods=['POST'])
+def analyze_proportion():
+    if 'image' not in request.files:
+        return jsonify({'message': 'image required'}), 400
+    image = request.files['image'].read()
+    points, err = extract_keypoints(image)
+    if err == "mediapipe_missing":
+        return jsonify({'message': 'mediapipe not installed'}), 501
+    if err == "no_pose":
+        return jsonify({'message': 'pose not detected'}), 422
+    if err and err.startswith("mediapipe_error:"):
+        return jsonify({'message': err}), 500
+    ratios = compute_ratios(points)
+    gender_label, gender_conf = estimate_gender(ratios)
+    return jsonify({'ratios': ratios, 'gender': gender_label, 'gender_confidence': gender_conf}), 200
+
+@main_bp.route('/api/identify-body-shape', methods=['POST'])
+def identify_body_shape():
+    if 'image' not in request.files:
+        return jsonify({'message': 'image required'}), 400
+    image = request.files['image'].read()
+    points, err = extract_keypoints(image)
+    if err == "mediapipe_missing":
+        return jsonify({'message': 'mediapipe not installed'}), 501
+    if err == "no_pose":
+        return jsonify({'message': 'pose not detected'}), 422
+    if err and err.startswith("mediapipe_error:"):
+        return jsonify({'message': err}), 500
+    ratios = compute_ratios(points)
+    gender_label, gender_conf = estimate_gender(ratios)
+    # Hybrid prediction with confidence and fallback
+    try:
+        shape, conf, source = predict_shape_with_confidence(ratios)
+    except Exception:
+        # Safe fallback
+        shape = predict_shape(ratios)
+        conf = 0.6
+        source = "rule_fallback"
+    return jsonify({'body_shape': shape, 'confidence': conf, 'source': source, 'ratios': ratios, 'gender': gender_label, 'gender_confidence': gender_conf}), 200
+
+@main_bp.route('/api/ai/status', methods=['GET'])
+def ai_status():
+    import sys as _sys
+    import os as _os
+    status = {
+        'python_executable': _sys.executable,
+        'python_version': _sys.version,
+        'cwd': _os.getcwd(),
+        'mediapipe_installed': False,
+        'mediapipe_version': None
+    }
+    try:
+        import mediapipe as mp  # type: ignore
+        status['mediapipe_installed'] = True
+        try:
+            import importlib.metadata as ilmd  # py3.8+
+            status['mediapipe_version'] = ilmd.version('mediapipe')
+        except Exception:
+            status['mediapipe_version'] = getattr(mp, '__version__', None)
+    except Exception:
+        status['mediapipe_installed'] = False
+    return jsonify(status), 200
+
+@main_bp.route('/api/remove-bg', methods=['POST'])
+def remove_bg():
+    if 'image' not in request.files:
+        return jsonify({'message': 'image required'}), 400
+    try:
+        img_bytes = request.files['image'].read()
+        result = remove_background_rgba(img_bytes)
+        if isinstance(result, tuple) and len(result) == 2:
+            out_bytes, mime = result
+        else:
+            out_bytes, mime = result, "image/png"
+        return Response(out_bytes, mimetype=mime)
+    except RuntimeError as e:
+        if str(e) == "mediapipe_missing":
+            return jsonify({'message': 'mediapipe not installed'}), 501
+        return jsonify({'message': f'processing error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'message': f'error: {str(e)}'}), 500
 @main_bp.route('/api/register', methods=['POST'])
 def register():
     data = request.json
@@ -497,6 +583,8 @@ def crawl():
 def save_crawled_products():
     data = request.json
     products_to_save = data.get('products', [])
+    default_shop_name = (data.get('shop_name') or '').strip()
+    default_shop_url = (data.get('shop_url') or '').strip()
     
     if not products_to_save:
         return jsonify({'message': 'No products to save'}), 400
@@ -548,7 +636,25 @@ def save_crawled_products():
             product.fit_type = (item.get('fit_type') or 'Regular fit')[:50]
             product.color_tone = (item.get('color_tone') or 'Neutral')[:20]
             product.details = (item.get('details') or '')[:200]
-            product.shop_name = (item.get('shop_name') or 'Shopee Store')[:150]
+            # Shop name resolution:
+            # 1) Use provided item.shop_name
+            # 2) Use request-level default_shop_name if provided
+            # 3) If Shopee link with /product/<shopid>/<itemid>, label as "Shopee Shop <shopid>"
+            # 4) Fallback "Shopee Store"
+            resolved_shop = (item.get('shop_name') or '').strip()
+            if not resolved_shop:
+                resolved_shop = default_shop_name
+            if not resolved_shop and link_value and 'shopee.vn' in link_value:
+                import re
+                m = re.search(r'/product/(\d+)/\d+', link_value)
+                if m:
+                    resolved_shop = f"Shopee Shop {m.group(1)}"
+            if not resolved_shop and link_value and 'lazada.vn' in link_value:
+                # Best-effort for Lazada: take domain prefix as label
+                resolved_shop = 'Lazada Store'
+            if not resolved_shop:
+                resolved_shop = 'Shopee Store'
+            product.shop_name = resolved_shop[:150]
             product.crawl_date = datetime.utcnow()
             product.is_active = True
 
@@ -618,6 +724,28 @@ def save_crawled_products():
                 new_db_items.append(product)
 
         db.session.commit()
+
+        # Persist shop registry (name → url) for frontend listing
+        try:
+            registry_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'shops.json'))
+            os.makedirs(os.path.dirname(registry_path), exist_ok=True)
+            shops_map = {}
+            if os.path.exists(registry_path):
+                with open(registry_path, 'r', encoding='utf-8') as f:
+                    try:
+                        shops_map = _json.load(f)
+                    except Exception:
+                        shops_map = {}
+            if default_shop_name:
+                # Keep first non-empty URL or update with provided default_shop_url
+                current = shops_map.get(default_shop_name, {})
+                cur_url = current.get('shop_url')
+                new_url = default_shop_url or cur_url
+                shops_map[default_shop_name] = {'shop_name': default_shop_name, 'shop_url': new_url}
+            with open(registry_path, 'w', encoding='utf-8') as f:
+                _json.dump(shops_map, f, ensure_ascii=False, indent=2)
+        except Exception as _e:
+            current_app.logger.warning(f"Shop registry update skipped: {_e}")
 
         return jsonify({
             'message': f'Catalog updated. Added {saved_count} new products and refreshed {len(new_db_items)} items.',
@@ -738,6 +866,128 @@ def batch_delete_products():
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Error deleting products: {str(e)}'}), 500
+
+@main_bp.route('/api/products/backfill_shopname', methods=['POST'])
+def backfill_shopname():
+    """
+    One-time utility: fill missing/placeholder shop_name for Shopee/Lazada products
+    based on product_url patterns. Useful when earlier saves used generic names.
+    """
+    try:
+        import re
+        updated = 0
+        products = Product.query.all()
+        for p in products:
+            name = (p.shop_name or '').strip()
+            url = p.product_url or ''
+            new_name = None
+            if (not name) or name in ('Shopee Store', 'Lazada Store'):
+                if 'shopee.vn' in url:
+                    m = re.search(r'/product/(\d+)/\d+', url)
+                    if m:
+                        new_name = f"Shopee Shop {m.group(1)}"
+                elif 'lazada.vn' in url:
+                    new_name = 'Lazada Store'
+            if new_name and new_name != p.shop_name:
+                p.shop_name = new_name[:150]
+                updated += 1
+        if updated:
+            db.session.commit()
+        return jsonify({'message': 'Backfill completed', 'updated': updated}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Backfill error: {str(e)}'}), 500
+
+@main_bp.route('/api/recolor', methods=['POST'])
+def api_recolor():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'message': 'image required'}), 400
+        img_b = request.files['image'].read()
+        color = request.form.get('color') or request.args.get('color') or '#ff0000'
+        strength = float(request.form.get('strength') or request.args.get('strength') or 0.8)
+        out_b, mime = recolor_clothing(img_b, color, strength)
+        return Response(out_b, mimetype=mime)
+    except Exception as e:
+        return jsonify({'message': f'recolor error: {str(e)}'}), 500
+
+@main_bp.route('/api/upscale', methods=['POST'])
+def api_upscale():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'message': 'image required'}), 400
+        img_b = request.files['image'].read()
+        scale = int(request.form.get('scale') or request.args.get('scale') or 2)
+        out_b, mime = upscale_image(img_b, scale)
+        return Response(out_b, mimetype=mime)
+    except Exception as e:
+        return jsonify({'message': f'upscale error: {str(e)}'}), 500
+
+@main_bp.route('/api/shops', methods=['GET'])
+def list_shops():
+    """
+    Aggregate distinct shops from Product table and derive shop URLs when possible.
+    For Shopee product_url like /product/<shopid>/<itemid> → https://shopee.vn/shop/<shopid>
+    For Lazada, fallback to homepage.
+    """
+    try:
+        import re
+        # Use all products (or last 500) to discover shops quickly
+        products = Product.query.order_by(Product.id.desc()).limit(500).all()
+        shops = {}
+        for p in products:
+            name = (p.shop_name or '').strip() or 'Unknown Shop'
+            url = p.product_url or ''
+            shop_url = None
+            if 'shopee.vn' in url:
+                m = re.search(r'/product/(\d+)/\d+', url)
+                if m:
+                    shop_id = m.group(1)
+                    shop_url = f"https://shopee.vn/shop/{shop_id}"
+            elif 'lazada.vn' in url:
+                shop_url = "https://www.lazada.vn/"
+            if name not in shops:
+                shops[name] = {'shop_name': name, 'shop_url': shop_url, 'count': 0}
+            # Prefer a discovered URL
+            if not shops[name]['shop_url'] and shop_url:
+                shops[name]['shop_url'] = shop_url
+            shops[name]['count'] += 1
+        # Overlay registry (saved by admin when crawl/save)
+        try:
+            registry_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'shops.json'))
+            if os.path.exists(registry_path):
+                with open(registry_path, 'r', encoding='utf-8') as f:
+                    saved_map = _json.load(f)
+                    for n, v in saved_map.items():
+                        if n not in shops:
+                            shops[n] = {'shop_name': n, 'shop_url': v.get('shop_url'), 'count': 0}
+                        else:
+                            if v.get('shop_url'):
+                                shops[n]['shop_url'] = v.get('shop_url')
+        except Exception as _e:
+            current_app.logger.warning(f"Shop registry read failed: {_e}")
+
+        items = sorted(shops.values(), key=lambda x: x['shop_name'].lower())
+        return jsonify(items), 200
+    except Exception as e:
+        return jsonify({'message': f'list_shops error: {str(e)}'}), 500
+
+@main_bp.route('/api/admin/shops/rename', methods=['POST'])
+def rename_shop():
+    try:
+        data = request.json or {}
+        old = (data.get('old_name') or '').strip()
+        new = (data.get('new_name') or '').strip()
+        if not old or not new:
+            return jsonify({'message': 'old_name and new_name required'}), 400
+        if old == new:
+            return jsonify({'message': 'No change'}), 200
+        updated = Product.query.filter(Product.shop_name == old).update({'shop_name': new}, synchronize_session=False)
+        db.session.commit()
+        return jsonify({'message': 'ok', 'updated': updated}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'shop rename error: {str(e)}'}), 500
 
 @main_bp.route('/api/products/<int:id>', methods=['GET', 'DELETE', 'PUT'])
 def product_detail(id):

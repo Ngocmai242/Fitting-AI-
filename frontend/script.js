@@ -297,6 +297,247 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Populate Date Dropdowns
     populateDateDropdowns();
+
+    const toolRemove = document.getElementById('tool-remove-bg');
+    const toolRecolor = document.getElementById('tool-recolor');
+    const toolUpscale = document.getElementById('tool-upscale');
+    const recolorControls = document.getElementById('recolor-controls');
+    const upscaleControls = document.getElementById('upscale-controls');
+    const fileRemove = document.getElementById('removebg-file');
+    const outRemove = document.getElementById('removebg-output');
+    const recolorFile = document.getElementById('recolor-file');
+    const recolorColor = document.getElementById('recolor-color');
+    const recolorStrength = document.getElementById('recolor-strength');
+    const recolorChoose = document.getElementById('recolor-choose');
+    const recolorChooseImage = document.getElementById('recolor-choose-image');
+    const recolorOut = document.getElementById('recolor-output');
+    const recolorFilePanel = document.getElementById('recolor-file-panel');
+    const recolorFileName = document.getElementById('recolor-file-name');
+    const recolorConfirm = document.getElementById('recolor-confirm');
+    const recolorCancel = document.getElementById('recolor-cancel');
+    let pendingRecolorFile = null;
+    const upscaleFile = document.getElementById('upscale-file');
+    const upscaleScale = document.getElementById('upscale-scale');
+    const upscaleChoose = document.getElementById('upscale-choose');
+    const upscaleOut = document.getElementById('upscale-output');
+    // Tool view switcher (simulate separate pages via ?tool=)
+    function getToolParam() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('tool');
+    }
+    function setToolParam(val) {
+        const url = new URL(window.location.href);
+        if (val) url.searchParams.set('tool', val);
+        else url.searchParams.delete('tool');
+        url.hash = 'tools';
+        window.history.pushState({}, '', url.toString());
+    }
+    function showTool(tool) {
+        const cards = {
+            remove: document.getElementById('tool-remove-bg'),
+            recolor: document.getElementById('tool-recolor'),
+            upscale: document.getElementById('tool-upscale')
+        };
+        if (recolorControls) recolorControls.style.display = tool === 'recolor' ? 'flex' : 'none';
+        if (upscaleControls) upscaleControls.style.display = tool === 'upscale' ? 'flex' : 'none';
+        const outRemove = document.getElementById('removebg-output');
+        const recolorOut = document.getElementById('recolor-output');
+        const upscaleOut = document.getElementById('upscale-output');
+        if (tool === 'recolor' || tool === 'upscale') {
+            if (outRemove) outRemove.innerHTML = '';
+            const fileRemove = document.getElementById('removebg-file');
+            if (fileRemove) fileRemove.value = '';
+        }
+        if (tool === 'remove') {
+            if (recolorOut) recolorOut.innerHTML = '';
+            const recolorFile = document.getElementById('recolor-file');
+            if (recolorFile) recolorFile.value = '';
+            if (upscaleOut) upscaleOut.innerHTML = '';
+            const upscaleFile = document.getElementById('upscale-file');
+            if (upscaleFile) upscaleFile.value = '';
+        }
+        const highlight = (el, active) => {
+            if (!el) return;
+            el.style.boxShadow = active ? '0 0 0 3px rgba(76,110,245,0.35)' : 'none';
+            el.style.transform = active ? 'scale(1.02)' : 'scale(1)';
+        };
+        highlight(cards.remove, tool === 'remove');
+        highlight(cards.recolor, tool === 'recolor');
+        highlight(cards.upscale, tool === 'upscale');
+        if (tool) document.getElementById('tools')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    // Initialize from URL
+    const initialTool = getToolParam();
+    if (initialTool) showTool(initialTool);
+
+    if (toolRemove && fileRemove && outRemove) {
+        toolRemove.addEventListener('click', () => {
+            setToolParam('remove');
+            showTool('remove');
+            fileRemove.click();
+        });
+        fileRemove.addEventListener('change', async (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            const origUrl = URL.createObjectURL(f);
+            lastOriginalBlob = f;
+            outRemove.innerHTML = '<div style="padding:12px; color:#666;">Processing...</div>';
+            const fd = new FormData();
+            fd.append('image', f);
+            try {
+                const res = await fetch(`${API_URL}/remove-bg`, { method: 'POST', body: fd });
+                const ct = res.headers.get('content-type') || '';
+                if (!res.ok) {
+                    let msg = 'Image processing error';
+                    if (ct.includes('application/json')) {
+                        const j = await res.json().catch(() => ({}));
+                        msg = j.message || msg;
+                    } else {
+                        msg = await res.text().catch(() => msg);
+                    }
+                    outRemove.innerHTML = `<div style="padding:12px; color:#e57373;">${msg}</div>`;
+                    return;
+                }
+                if (ct.includes('image/')) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    outRemove.innerHTML = `
+                        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                            <div style="flex:1; min-width:240px;">
+                                <div style="font-weight:600; margin-bottom:6px;">Original</div>
+                                <img src="${origUrl}" alt="original" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                            </div>
+                            <div style="flex:1; min-width:240px;">
+                                <div style="font-weight:600; margin-bottom:6px;">Background Removed (PNG)</div>
+                                <img src="${url}" alt="result" style="max-width:100%; border-radius:8px; border:1px solid #eee; background:checkerboard;">
+                                <div style="margin-top:8px;">
+                                    <a href="${url}" download="removed_bg.png" class="btn btn-secondary" style="width:auto;">Download</a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const txt = await res.text();
+                    outRemove.innerHTML = `<div style="padding:12px; color:#e57373;">${txt || 'Invalid response'}</div>`;
+                }
+            } catch (err) {
+                outRemove.innerHTML = `<div style="padding:12px; color:#e57373;">${err.message || 'Server connection error'}</div>`;
+            } finally {
+                fileRemove.value = '';
+            }
+        });
+    }
+
+    async function runRecolorWithBlob(blob) {
+        const origUrl = URL.createObjectURL(blob);
+        recolorOut.innerHTML = '<div style="padding:12px; color:#666;">Processing...</div>';
+        const fd = new FormData();
+        fd.append('image', blob, 'input.png');
+        fd.append('color', recolorColor.value || '#ff6b6b');
+        fd.append('strength', recolorStrength.value || '0.8');
+        const res = await fetch(`${API_URL}/recolor`, { method: 'POST', body: fd });
+        if (!res.ok) {
+            const txt = await res.text();
+            recolorOut.innerHTML = `<div style="padding:12px; color:#e57373;">${txt}</div>`;
+            return;
+        }
+        const outBlob = await res.blob();
+        const url = URL.createObjectURL(outBlob);
+        recolorOut.innerHTML = `
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:240px;">
+                    <div style="font-weight:600; margin-bottom:6px;">Original</div>
+                    <img src="${origUrl}" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                </div>
+                <div style="flex:1; min-width:240px;">
+                    <div style="font-weight:600; margin-bottom:6px;">Recolored</div>
+                    <img src="${url}" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                    <div style="margin-top:8px;"><a href="${url}" download="recolored.png" class="btn btn-secondary" style="width:auto;">Download</a></div>
+                </div>
+            </div>
+        `;
+    }
+
+    async function runUpscaleWithBlob(blob) {
+        const origUrl = URL.createObjectURL(blob);
+        upscaleOut.innerHTML = '<div style="padding:12px; color:#666;">Upscaling...</div>';
+        const fd = new FormData();
+        fd.append('image', blob, 'input.png');
+        fd.append('scale', upscaleScale.value || '2');
+        const res = await fetch(`${API_URL}/upscale`, { method: 'POST', body: fd });
+        if (!res.ok) {
+            const txt = await res.text();
+            upscaleOut.innerHTML = `<div style="padding:12px; color:#e57373;">${txt}</div>`;
+            return;
+        }
+        const outBlob = await res.blob();
+        const url = URL.createObjectURL(outBlob);
+        upscaleOut.innerHTML = `
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:240px;">
+                    <div style="font-weight:600; margin-bottom:6px;">Original</div>
+                    <img src="${origUrl}" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                </div>
+                <div style="flex:1; min-width:240px;">
+                    <div style="font-weight:600; margin-bottom:6px;">Upscaled</div>
+                    <img src="${url}" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                    <div style="margin-top:8px;"><a href="${url}" download="upscaled.png" class="btn btn-secondary" style="width:auto;">Download</a></div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (toolRecolor && recolorFile && recolorColor && recolorOut && recolorChoose) {
+        toolRecolor.addEventListener('click', () => {
+            setToolParam('recolor');
+            showTool('recolor');
+        });
+        // open color picker
+        recolorChoose.addEventListener('click', () => recolorColor && recolorColor.click());
+        if (recolorChooseImage) {
+            recolorChooseImage.addEventListener('click', () => recolorFile.click());
+        }
+        recolorFile.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            pendingRecolorFile = f;
+            if (recolorFilePanel) {
+                recolorFilePanel.style.display = 'flex';
+                if (recolorFileName) recolorFileName.textContent = `Selected: ${f.name}`;
+            }
+        });
+        if (recolorConfirm) {
+            recolorConfirm.addEventListener('click', async () => {
+                if (!pendingRecolorFile) return;
+                await runRecolorWithBlob(pendingRecolorFile);
+                if (recolorFilePanel) recolorFilePanel.style.display = 'none';
+                pendingRecolorFile = null;
+                recolorFile.value = '';
+            });
+        }
+        if (recolorCancel) {
+            recolorCancel.addEventListener('click', () => {
+                pendingRecolorFile = null;
+                if (recolorFilePanel) recolorFilePanel.style.display = 'none';
+                if (recolorFileName) recolorFileName.textContent = '';
+                recolorFile.value = '';
+            });
+        }
+    }
+
+    if (toolUpscale && upscaleFile && upscaleOut && upscaleChoose) {
+        toolUpscale.addEventListener('click', () => {
+            setToolParam('upscale');
+            showTool('upscale');
+        });
+        upscaleChoose.addEventListener('click', () => upscaleFile.click());
+        upscaleFile.addEventListener('change', async (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            await runUpscaleWithBlob(f);
+            upscaleFile.value = '';
+        });
+    }
 });
 
 function populateDateDropdowns() {
@@ -334,6 +575,53 @@ function populateDateDropdowns() {
     addOps(yearSelect, 1920, new Date().getFullYear(), true);
 }
 
+async function submitBodyAnalysis() {
+    const input = document.getElementById('body-image');
+    const out = document.getElementById('body-result');
+    if (!input || !input.files || input.files.length === 0) {
+        out.textContent = 'Please choose an image.';
+        return;
+    }
+    const fd = new FormData();
+    fd.append('image', input.files[0]);
+    try {
+        const res = await fetch(`${API_URL}/analyze-proportion`, { method: 'POST', body: fd, headers: { 'Accept': 'application/json' } });
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : { message: await res.text() };
+        if (!res.ok) {
+            out.textContent = data.message || 'Error';
+            return;
+        }
+        out.innerText = '';
+        out.innerHTML = formatAnalyzeHTML(data);
+    } catch (e) {
+        out.textContent = e.message;
+    }
+}
+
+async function submitBodyShape() {
+    const input = document.getElementById('body-image');
+    const out = document.getElementById('body-result');
+    if (!input || !input.files || input.files.length === 0) {
+        out.textContent = 'Please choose an image.';
+        return;
+    }
+    const fd = new FormData();
+    fd.append('image', input.files[0]);
+    try {
+        const res = await fetch(`${API_URL}/identify-body-shape`, { method: 'POST', body: fd, headers: { 'Accept': 'application/json' } });
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : { message: await res.text() };
+        if (!res.ok) {
+            out.textContent = data.message || 'Error';
+            return;
+        }
+        out.innerText = '';
+        out.innerHTML = formatIdentifyHTML(data);
+    } catch (e) {
+        out.textContent = e.message;
+    }
+}
 async function checkUserSession() {
     // Port check moved to global scope
 
@@ -418,6 +706,248 @@ function updateNavbarFromLocalStorage(user) {
             this.src = `https://ui-avatars.com/api/?name=${user.username || 'User'}&background=random&color=fff`;
         };
     }
+}
+
+function _round(x) {
+    return Math.round(x * 1000) / 1000;
+}
+
+function getPreferredGender(r) {
+    const sel = document.getElementById('gender-select');
+    if (sel) {
+        const v = (sel.value || '').toLowerCase();
+        if (v === 'male') return 'Male';
+        if (v === 'female') return 'Female';
+    }
+    return guessGenderFromRatios(r);
+}
+
+function guessGenderFromRatios(r) {
+    const s = r.shoulder_ratio || 0;
+    const h = r.hip_ratio || 0;
+    const w = r.waist_ratio || 0;
+    // Conservative thresholds to avoid misclassification
+    if ((s - h) > 0.05 && w >= (Math.min(s, h) * 0.80)) return 'Male';
+    if ((h - s) > 0.05 && w <= (Math.min(s, h) * 0.95)) return 'Female';
+    return 'Uncertain';
+}
+
+function guessShapeFromRatios(r) {
+    const s = r.shoulder_ratio || 0;
+    const h = r.hip_ratio || 0;
+    const delta = s - h;
+    if (Math.abs(delta) < 0.02) return 'H';
+    if (delta >= 0.05) return 'V';
+    if (delta <= -0.03) return 'A';
+    return 'H';
+}
+
+function humanShapeName(shape) {
+    if (shape === 'X') return 'Hourglass (X)';
+    if (shape === 'V') return 'Inverted Triangle (V)';
+    if (shape === 'A') return 'Triangle/Pear (A)';
+    return 'Rectangle (H)';
+}
+
+function recsFor(shape, gender) {
+    const male = {
+        V: [
+            'V-neck tops; darker colors on top',
+            'Straight-leg trousers to balance broad shoulders',
+            'Avoid heavy shoulder pads and tight shoulder fits'
+        ],
+        A: [
+            'Structured jackets to add width to the upper body',
+            'Light-colored shirts; details around shoulders/chest',
+            'Avoid overly tight pants that emphasize hips'
+        ],
+        H: [
+            'Layering with structured outerwear to create angles',
+            'Straight-leg pants with mid rise',
+            'Avoid skin-tight outfits head-to-toe'
+        ],
+        X: [
+            'Well-fitted tops; define the waist with belts',
+            'Straight or slim trousers (not too skinny)',
+            'Avoid overly oversized silhouettes that hide the waist'
+        ]
+    };
+    const female = {
+        V: [
+            'A-line and flared skirts to balance hips',
+            'V-neck and raglan sleeves to soften shoulders',
+            'Avoid large shoulder pads and stiff peplums'
+        ],
+        A: [
+            'Shoulder/collar details; cropped jackets; structured blazers',
+            'Darker, slightly straight skirts or trousers',
+            'Avoid overly flared skirts at the hips'
+        ],
+        H: [
+            'Wrap dresses; highlight the waist with belts',
+            'Wide-leg or straight pants, mid/high rise',
+            'Avoid full bodycon looks'
+        ],
+        X: [
+            'Fitted dresses; light peplum; high-waist bottoms',
+            'Pencil skirts; straight-leg trousers',
+            'Avoid oversized items that hide the waist'
+        ]
+    };
+    const bank = gender === 'Male' ? male : female;
+    return bank[shape] || [];
+}
+
+function formatAnalyzeNarrative(r) {
+    const s = _round(r.shoulder_ratio || 0);
+    const w = _round(r.waist_ratio || 0);
+    const h = _round(r.hip_ratio || 0);
+    const l = _round(r.leg_ratio || 0);
+    const gender = getPreferredGender(r);
+    const shape = guessShapeFromRatios(r);
+    const name = humanShapeName(shape);
+    const notes = [];
+    if (s > h + 0.02) notes.push('Shoulders are wider than hips');
+    else if (h > s + 0.02) notes.push('Hips are wider than shoulders');
+    else notes.push('Shoulders and hips are balanced');
+    if (w < Math.min(s, h) * 0.85) notes.push('Defined waist');
+    if (l > 0.5) notes.push('Long leg proportion');
+    const rs = recsFor(shape, gender === 'Uncertain' ? 'Female' : gender);
+    const gline = gender === 'Uncertain' ? 'Estimated gender: Uncertain (you can set it above)' : `Estimated gender: ${gender}`;
+    const header = `Body Proportions Summary\nLikely shape: ${name}\n${gline}`;
+    const ratios = `Key ratios:\n- Shoulder-to-Height: ${s}\n- Waist-to-Height: ${w}\n- Hip-to-Height: ${h}\n- Leg-to-Height: ${l}`;
+    const obs = `Observations:\n- ${notes.join('\n- ')}`;
+    const rec = rs.length ? `Recommended outfits:\n- ${rs.join('\n- ')}` : `Recommended outfits:\n- Choose well-fitted pieces, balance shoulder–hip, lightly define the waist`;
+    return [header, ratios, obs, rec].join('\n\n');
+}
+
+function formatIdentifyNarrative(data) {
+    const r = data.ratios || {};
+    const s = _round(r.shoulder_ratio || 0);
+    const w = _round(r.waist_ratio || 0);
+    const h = _round(r.hip_ratio || 0);
+    const l = _round(r.leg_ratio || 0);
+    const shape = data.body_shape || guessShapeFromRatios(r);
+    const name = humanShapeName(shape);
+    const conf = typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : null;
+    const userPref = getPreferredGender(r);
+    const gender = userPref !== 'Uncertain' ? userPref : (data.gender || 'Uncertain');
+    const rs = recsFor(shape, gender === 'Uncertain' ? 'Female' : gender);
+    const header = conf !== null ? `Body shape: ${name} (confidence ~${conf}%)` : `Body shape: ${name}`;
+    const gconf = typeof data.gender_confidence === 'number' ? ` (~${Math.round(data.gender_confidence * 100)}%)` : '';
+    const gline = gender === 'Uncertain'
+        ? 'Estimated gender: Uncertain (you can set it above)'
+        : `Estimated gender: ${gender}${userPref !== 'Uncertain' ? ' (selected)' : gconf}`;
+    const ratios = `Key ratios:\n- Shoulder-to-Height: ${s}\n- Waist-to-Height: ${w}\n- Hip-to-Height: ${h}\n- Leg-to-Height: ${l}`;
+    const rec = rs.length ? `Recommended outfits:\n- ${rs.join('\n- ')}` : `Recommended outfits:\n- Choose well-fitted pieces, balance shoulder–hip, lightly define the waist`;
+    const src = data.source ? `Prediction source: ${data.source === 'ml' ? 'ML model' : data.source.replace('_', ' ')}` : '';
+    return [header, gline, ratios, rec, src].filter(Boolean).join('\n\n');
+}
+
+function formatAnalyzeHTML(data) {
+    const r = data.ratios || data || {};
+    const s = _round(r.shoulder_ratio || 0);
+    const w = _round(r.waist_ratio || 0);
+    const h = _round(r.hip_ratio || 0);
+    const l = _round(r.leg_ratio || 0);
+    const userPref = getPreferredGender(r);
+    const gender = userPref !== 'Uncertain' ? userPref : (data.gender || 'Uncertain');
+    const gconf = userPref !== 'Uncertain'
+        ? ' (selected)'
+        : (typeof data.gender_confidence === 'number' ? ` (~${Math.round(data.gender_confidence * 100)}%)` : '');
+    const shape = guessShapeFromRatios(r);
+    const name = humanShapeName(shape);
+    const notes = [];
+    if (s > h + 0.02) notes.push('Shoulders are wider than hips');
+    else if (h > s + 0.02) notes.push('Hips are wider than shoulders');
+    else notes.push('Shoulders and hips are balanced');
+    if (w < Math.min(s, h) * 0.85) notes.push('Defined waist');
+    if (l > 0.5) notes.push('Long leg proportion');
+    const rs = recsFor(shape, gender === 'Uncertain' ? 'Female' : gender);
+    const recLis = rs.map(x => `<li>${x}</li>`).join('');
+    const obsLis = notes.map(x => `<li>${x}</li>`).join('');
+    return `
+    <div style="background:#fff; border:1px solid #eee; border-radius:12px; padding:16px; text-align:left;">
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Body shape</div>
+          <div>${name}</div>
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Estimated gender</div>
+          <div>${gender}${gconf}</div>
+        </div>
+      </div>
+      <hr style="border:none; border-top:1px solid #eee; margin:12px 0;">
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Key ratios</div>
+          <ul style="margin:0; padding-left:18px;">
+            <li>Shoulder-to-Height: ${s}</li>
+            <li>Waist-to-Height: ${w}</li>
+            <li>Hip-to-Height: ${h}</li>
+            <li>Leg-to-Height: ${l}</li>
+          </ul>
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Observations</div>
+          <ul style="margin:0; padding-left:18px;">${obsLis}</ul>
+        </div>
+      </div>
+      <hr style="border:none; border-top:1px solid #eee; margin:12px 0;">
+      <div>
+        <div style="font-weight:600; margin-bottom:6px;">Recommended outfits</div>
+        <ul style="margin:0; padding-left:18px;">${recLis || '<li>Choose well-fitted pieces, balance shoulder–hip, lightly define the waist</li>'}</ul>
+      </div>
+    </div>`;
+}
+
+function formatIdentifyHTML(data) {
+    const r = data.ratios || {};
+    const s = _round(r.shoulder_ratio || 0);
+    const w = _round(r.waist_ratio || 0);
+    const h = _round(r.hip_ratio || 0);
+    const l = _round(r.leg_ratio || 0);
+    const shape = data.body_shape || guessShapeFromRatios(r);
+    const name = humanShapeName(shape);
+    const conf = typeof data.confidence === 'number' ? ` (~${Math.round(data.confidence * 100)}%)` : '';
+    const userPref = getPreferredGender(r);
+    const gender = userPref !== 'Uncertain' ? userPref : (data.gender || 'Uncertain');
+    const gconf = userPref !== 'Uncertain'
+        ? ' (selected)'
+        : (typeof data.gender_confidence === 'number' ? ` (~${Math.round(data.gender_confidence * 100)}%)` : '');
+    const rs = recsFor(shape, gender === 'Uncertain' ? 'Female' : gender);
+    const recLis = rs.map(x => `<li>${x}</li>`).join('');
+    return `
+    <div style="background:#fff; border:1px solid #eee; border-radius:12px; padding:16px; text-align:left;">
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Body shape</div>
+          <div>${name}${conf}</div>
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Estimated gender</div>
+          <div>${gender}${gconf}</div>
+        </div>
+      </div>
+      <hr style="border:none; border-top:1px solid #eee; margin:12px 0;">
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Key ratios</div>
+          <ul style="margin:0; padding-left:18px;">
+            <li>Shoulder-to-Height: ${s}</li>
+            <li>Waist-to-Height: ${w}</li>
+            <li>Hip-to-Height: ${h}</li>
+            <li>Leg-to-Height: ${l}</li>
+          </ul>
+        </div>
+        <div style="flex:1; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:6px;">Recommended outfits</div>
+          <ul style="margin:0; padding-left:18px;">${recLis || '<li>Choose well-fitted pieces, balance shoulder–hip, lightly define the waist</li>'}</ul>
+        </div>
+      </div>
+      ${data.source ? `<div style="margin-top:8px; color:#666;">Prediction source: ${data.source === 'ml' ? 'ML model' : data.source.replace('_', ' ')}</div>` : ''}
+    </div>`;
 }
 
 // Carousel Logic
@@ -727,25 +1257,180 @@ async function saveProfile() {
 
 async function loadShopItems() {
     const grid = document.getElementById('shop-grid-container');
+    const filters = document.getElementById('shop-filters');
+    const toggleBtn = document.getElementById('shop-toggle-btn');
+    const shopsRow = document.getElementById('shops-row');
     if (!grid) return;
-
     try {
-        const res = await fetch(`${API_URL}/outfits`);
-        const data = await res.json();
-        grid.innerHTML = '';
-        data.forEach(item => {
-            grid.innerHTML += `
-               <div class="card">
-                    <img src="${item.image}">
+        // 1) Load distinct shops (with shop_url) and show as links
+        const shopRes = await fetch(`${API_URL}/shops`);
+        const shopList = await shopRes.json();
+        // 2) Lazy load products only after user clicks a shop
+        let productsCache = null;
+        let currentShop = null;
+        let expanded = false;
+        const ensureProducts = async () => {
+            if (productsCache) return productsCache;
+            const res = await fetch(`${API_URL}/products`);
+            productsCache = await res.json();
+            return productsCache;
+        };
+        const renderProducts = async (shopName) => {
+            currentShop = shopName;
+            const products = await ensureProducts();
+            grid.innerHTML = '';
+            const full = shopName === 'ALL' ? products : products.filter(p => (p.shop_name || '').trim() === shopName);
+            const items = expanded ? full : full.slice(0, Math.min(full.length, 4));
+            if (items.length === 0) {
+                grid.innerHTML = `<div style="padding:12px; color:#666;">No products available${shopName !== 'ALL' ? ' for this shop' : ''}.</div>`;
+                return;
+            }
+            items.forEach(p => {
+                const price = p.price && Number(p.price) > 0 ? `$${(Number(p.price)/100).toFixed(2)}` : '';
+                grid.innerHTML += `
+                  <div class="card">
+                    <img src="${p.image}" alt="${p.name}">
                     <div class="card-body">
-                        <h4>${item.name}</h4>
-                        <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                            <span class="badge">$49.99</span>
-                            <a href="${item.shop_link}" target="_blank" class="btn btn-secondary" style="width:auto; padding:5px 10px; font-size:0.8rem;">Buy Now</a>
+                      <h4 title="${p.name}">${p.name}</h4>
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                        <span class="badge" title="${p.shop_name}">${p.shop_name || 'Shop'}</span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                          ${price ? `<span class="badge" style="background:#eef;">${price}</span>` : ''}
+                          <a href="${p.product_url}" target="_blank" class="btn btn-secondary" style="width:auto; padding:5px 10px; font-size:0.8rem;">Buy</a>
                         </div>
+                      </div>
                     </div>
-               </div>
-            `;
-        });
-    } catch (e) { }
+                  </div>
+                `;
+            });
+            if (toggleBtn) {
+                toggleBtn.style.display = 'inline-block';
+                toggleBtn.textContent = expanded ? 'Collapse' : 'View All';
+            }
+        };
+        // Initial message (no products yet)
+        grid.innerHTML = `<div style="padding:12px; color:#666;">Choose a shop below to view products.</div>`;
+        if (shopsRow) {
+            shopsRow.innerHTML = '';
+            // Build pills with external link
+            const mkPill = (shop) => {
+                const wrap = document.createElement('div');
+                wrap.style = 'display:flex; align-items:center; gap:6px;';
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.style = 'width:auto; padding:6px 12px; font-size:0.85rem;';
+                btn.textContent = shop.shop_name;
+                btn.addEventListener('click', () => {
+                    expanded = true;
+                    if (filters) filters.style.display = 'flex';
+                    renderProducts(shop.shop_name);
+                });
+                wrap.appendChild(btn);
+                if (shop.shop_url) {
+                    const a = document.createElement('a');
+                    a.href = shop.shop_url;
+                    a.target = '_blank';
+                    a.title = 'Open shop';
+                    a.textContent = '↗';
+                    a.style = 'text-decoration:none; font-size:1rem;';
+                    wrap.appendChild(a);
+                }
+                return wrap;
+            };
+            // Optional "All Shops"
+            const allWrap = document.createElement('div');
+            allWrap.style = 'display:flex; align-items:center; gap:6px;';
+            const allBtn = document.createElement('button');
+            allBtn.className = 'btn';
+            allBtn.style = 'width:auto; padding:6px 12px; font-size:0.85rem;';
+            allBtn.textContent = 'All Shops';
+            allBtn.addEventListener('click', () => {
+                expanded = true;
+                if (filters) filters.style.display = 'flex';
+                renderProducts('ALL');
+            });
+            allWrap.appendChild(allBtn);
+            shopsRow.appendChild(allWrap);
+            (shopList || []).forEach(s => shopsRow.appendChild(mkPill(s)));
+
+            if ((shopList || []).length > 0) {
+                expanded = false;
+                if (filters) filters.style.display = 'flex';
+                await renderProducts(shopList[0].shop_name);
+            }
+        }
+        if (toggleBtn) {
+            toggleBtn.style.display = 'none'; // hidden until a shop is selected
+            toggleBtn.addEventListener('click', () => {
+                expanded = !expanded;
+                toggleBtn.textContent = expanded ? 'Collapse' : 'View All';
+                if (filters) filters.style.display = expanded ? 'flex' : 'none';
+                if (currentShop) renderProducts(currentShop);
+            });
+        }
+        if (filters) {
+            filters.innerHTML = ''; // will be filled after a shop is selected
+            filters.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Load products failed', e);
+    }
 }
+
+async function loadShopRegistry() {
+    const container = document.getElementById('shop-rename-container');
+    if (!container) return;
+    container.innerHTML = 'Loading...';
+    try {
+        const res = await fetch(`${API_URL}/shops`);
+        let shops = await res.json();
+        shops = (shops || []).filter(s => (s.shop_url || '').includes('shopee.vn'));
+        container.innerHTML = '';
+        if (!shops || shops.length === 0) {
+            container.innerHTML = '<div style="color:#666;">No Shopee shops found.</div>';
+            return;
+        }
+        shops.forEach(s => {
+            const row = document.createElement('div');
+            row.style = 'display:flex; gap:10px; align-items:center; margin-bottom:8px;';
+            const label = document.createElement('span');
+            label.textContent = s.shop_name;
+            label.style = 'min-width:220px; font-weight:600;';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = s.shop_name;
+            input.style = 'flex:1; padding:6px 8px;';
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-primary';
+            btn.style = 'width:auto; padding:6px 12px;';
+            btn.textContent = 'Save';
+            btn.addEventListener('click', async () => {
+                const newName = input.value.trim();
+                if (!newName || newName === s.shop_name) return;
+                const r = await fetch(`${API_URL}/admin/shops/rename`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_name: s.shop_name, new_name: newName })
+                });
+                const data = await r.json().catch(() => ({}));
+                if (r.ok) {
+                    await loadShopRegistry();
+                    alert(`Updated ${data.updated || 0} products to "${newName}"`);
+                } else {
+                    alert(data.message || 'Rename failed');
+                }
+            });
+            row.appendChild(label);
+            row.appendChild(input);
+            row.appendChild(btn);
+            container.appendChild(row);
+        });
+    } catch (e) {
+        container.innerHTML = '<div style="color:red;">Failed to load shops.</div>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const registry = document.getElementById('shop-rename-container');
+    if (registry) loadShopRegistry();
+});

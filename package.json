@@ -3,9 +3,10 @@
     "version": "1.0.0",
     "description": "AI Virtual Fitting & Style Recommendation Platform",
     "scripts": {
-        "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+        "start": "concurrently \"npm run backend\" \"npm run open\"",
         "backend": "python backend/server_dev.py",
-        "frontend": "http-server frontend -p 5500 -c-1 --cors -o admin_login.html"
+        "frontend": "http-server frontend -a 127.0.0.1 -p 5501 -c-1 --cors -o admin_login.html",
+        "open": "node -e \"require('child_process').exec('cmd /c start http://127.0.0.1:8080/admin_login.html')\""
     },
     "devDependencies": {
         "concurrently": "^8.2.2",

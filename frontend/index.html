@@ -272,8 +272,21 @@
                         <h3>Discover Your Shape</h3>
                         <p>Our AI analyzes your proportions to recommend the best fits for Hourglass, Pear, or Rectangle
                             shapes.</p>
-                        <button class="btn btn-secondary" style="width: auto; margin-top: 1rem;">View Style
-                            Suggestions</button>
+                        <div class="control-stack" style="margin-top:1rem; display:flex; flex-direction:column; gap:12px; align-items:center;">
+                            <div style="display:flex; justify-content:center;">
+                                <input type="file" id="body-image" accept="image/*" style="max-width:320px;">
+                            </div>
+                            <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; align-items:center;">
+                                <select id="gender-select" aria-label="Gender preference" style="padding:8px; border-radius:8px; border:1px solid #e0e0e0;">
+                                    <option value="auto" selected>Gender: Auto (beta)</option>
+                                    <option value="female">Female</option>
+                                    <option value="male">Male</option>
+                                </select>
+                                <button class="btn btn-secondary" style="width: auto;" onclick="submitBodyAnalysis()">Analyze Proportion</button>
+                                <button class="btn btn-primary" style="width: auto;" onclick="submitBodyShape()">Identify Body Shape</button>
+                            </div>
+                        </div>
+                        <div id="body-result" style="text-align:left; margin-top:16px; width:100%; max-width:100%; margin-left:0; margin-right:0; overflow:visible;"></div>
                     </div>
             </section>
 
@@ -283,9 +296,14 @@
                     <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
                             style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Shop
                         The Look</h2>
+                    <div id="shops-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
                     <div class="shop-grid" id="shop-grid-container">
                         <!-- Populated by JS -->
                     </div>
+                    <div id="shop-controls" style="margin-top: 12px; display:flex; gap:8px; align-items:center;">
+                        <button id="shop-toggle-btn" class="btn" style="width:auto; padding:6px 12px; font-size:0.9rem;">View All</button>
+                    </div>
+                    <div id="shop-filters" style="margin-top: 8px; display:none; gap:8px; flex-wrap:wrap;"></div>
                 </div>
             </section>
 
@@ -296,18 +314,54 @@
                             style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Image
                         Visualization</h2>
                     <div class="tool-grid">
-                        <div class="tool-card">
+                        <div class="tool-card" id="tool-remove-bg">
                             <i class="fas fa-eraser" style="font-size: 2rem; color: var(--pastel-pink);"></i>
                             <h4>Remove BG</h4>
                         </div>
-                        <div class="tool-card">
+                        <div class="tool-card" id="tool-recolor">
                             <i class="fas fa-paint-brush" style="font-size: 2rem; color: var(--pastel-blue);"></i>
                             <h4>Recolor</h4>
                         </div>
-                        <div class="tool-card">
+                        <div class="tool-card" id="tool-upscale">
                             <i class="fas fa-magic" style="font-size: 2rem; color: var(--success);"></i>
                             <h4>Upscale</h4>
                         </div>
+                    </div>
+                    <div style="margin-top:12px;">
+                        <input type="file" id="removebg-file" accept="image/*" style="display:none;">
+                        <div id="removebg-output" style="margin-top:16px;"></div>
+                        <div id="recolor-controls" style="display:none; margin-top:16px;">
+                            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                <input type="color" id="recolor-color" value="#ff6b6b" style="width:40px; height:40px; padding:0; border:none;">
+                                <button class="btn" id="recolor-choose" style="width:auto;">Choose Color</button>
+                                <select id="recolor-strength" style="padding:6px 8px;">
+                                    <option value="0.6">Soft</option>
+                                    <option value="0.8" selected>Normal</option>
+                                    <option value="1.0">Strong</option>
+                                </select>
+                                <button class="btn btn-secondary" id="recolor-choose-image" style="width:auto;">Choose File</button>
+                                <input type="file" id="recolor-file" accept="image/*" style="display:none;">
+                            </div>
+                            <div id="recolor-file-panel" style="display:none; margin-top:8px; padding:8px 12px; border:1px solid #eee; background:#f9fafc; border-radius:8px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                                    <span id="recolor-file-name" style="font-size:0.9rem; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+                                    <div style="display:flex; gap:8px;">
+                                        <button class="btn btn-primary" id="recolor-confirm" style="width:auto;">Confirm</button>
+                                        <button class="btn" id="recolor-cancel" style="width:auto; background:#eee;">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="recolor-output" style="margin-top:12px;"></div>
+                        <div id="upscale-controls" style="display:none; margin-top:16px; align-items:center; gap:10px;">
+                            <select id="upscale-scale" style="padding:6px 8px;">
+                                <option value="2" selected>2x</option>
+                                <option value="4">4x</option>
+                            </select>
+                            <input type="file" id="upscale-file" accept="image/*" style="display:none;">
+                            <button class="btn btn-secondary" id="upscale-choose" style="width:auto;">Choose Image</button>
+                        </div>
+                        <div id="upscale-output" style="margin-top:12px;"></div>
                     </div>
                 </div>
             </section>

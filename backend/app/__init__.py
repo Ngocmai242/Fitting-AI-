@@ -1,10 +1,11 @@
 import os
+import sys
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
-from data_engine.feature_engine import get_reference_taxonomy
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 db = SQLAlchemy()
 
@@ -50,6 +51,7 @@ def create_app():
 
 
 def seed_reference_data():
+    from data_engine.feature_engine import get_reference_taxonomy
     from .models import (
         Category,
         Color,

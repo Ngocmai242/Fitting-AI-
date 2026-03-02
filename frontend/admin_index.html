@@ -618,17 +618,27 @@
 
             <!-- Crawl Module -->
             <div id="mod-crawl" class="admin-module hidden">
-                <h2 class="section-title" style="text-align: left;">Data Crawler</h2>
+                <h2 class="section-title" style="text-align: left;">Shopee Crawler</h2>
                 <div class="admin-card">
                     <div class="form-group">
-                        <label>Shopee Shop URL</label>
+                        <label>Shop URL</label>
                         <div style="display: flex; gap: 10px;">
-                            <input type="text" id="crawl-url-input" placeholder="https://shopee.vn/shop_name" value=""
+                            <input type="text" id="crawl-url-input" placeholder="https://shopee.vn/..." value=""
                                 style="flex: 1;">
                             <button class="btn btn-secondary" id="btn-start-crawl" onclick="startCrawl()"
                                 style="width: auto; white-space: nowrap;">
                                 <i class="fas fa-spider"></i> Start Crawling
                             </button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label>Shop Name (Display)</label>
+                            <input type="text" id="crawl-shop-name" placeholder="e.g., Shopee Shop 123456" />
+                        </div>
+                        <div style="flex:1;">
+                            <label>Shop Link (to show in user)</label>
+                            <input type="text" id="crawl-shop-link" placeholder="https://shopee.vn/shop/123456" />
                         </div>
                     </div>
                     <div id="crawl-logs"
@@ -674,6 +684,11 @@
                             </table>
                         </div>
                     </div>
+                </div>
+                <div class="admin-card">
+                    <h3>Shop Names (Rename)</h3>
+                    <p>Rename the display name of crawled shops (Shopee only).</p>
+                    <div id="shop-rename-container" style="margin-top:10px;"></div>
                 </div>
             </div>
 
@@ -1768,7 +1783,6 @@
         }
 
         // Crawl Function
-        // Hàm crawl (sửa lại để hiển thị lỗi từ server)
         async function startCrawl() {
             const urlInput = document.getElementById('crawl-url-input');
             const logDiv = document.getElementById('crawl-logs');
@@ -1778,7 +1792,11 @@
             const url = urlInput.value.trim();
 
             if (!url) {
-                alert('Vui lòng nhập URL shop Shopee');
+                alert('Please enter a Shopee shop URL');
+                return;
+            }
+            if (!url.includes('shopee.vn')) {
+                alert('Only Shopee is supported. Please enter a Shopee URL (https://shopee.vn/...)');
                 return;
             }
 
@@ -1790,7 +1808,7 @@
 
             // Disable button
             btnStartCrawl.disabled = true;
-            btnStartCrawl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang crawl...';
+            btnStartCrawl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Crawling...';
 
             function log(msg, type = 'info') {
                 const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#0f0';
@@ -1799,11 +1817,11 @@
             }
 
             try {
-                log(`[1/4] Đang kết nối tới: ${url}...`);
+                log(`[1/4] Connecting to: ${url}...`);
                 await new Promise(r => setTimeout(r, 500));
-                log('[2/4] Đang khởi tạo crawler...');
+                log('[2/4] Initializing crawler...');
                 await new Promise(r => setTimeout(r, 500));
-                log('[3/4] Đang lấy dữ liệu sản phẩm (có thể mất 30-60 giây)...');
+                log('[3/4] Fetching product data (30–60 seconds)...');
 
                 const response = await fetch(`${window.APP_CONFIG.getApiUrl()}/crawl`, {
                     method: 'POST',
@@ -1814,12 +1832,11 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    // Lỗi từ server (status 4xx, 5xx)
-                    throw new Error(data.message || `Lỗi HTTP ${response.status}`);
+                    throw new Error(data.message || `HTTP Error ${response.status}`);
                 }
 
                 if (data.products && data.products.length > 0) {
-                    log(`[4/4] THÀNH CÔNG: Tìm thấy ${data.count} sản phẩm!`, 'success');
+                    log(`[4/4] SUCCESS: Found ${data.count} products!`, 'success');
 
                     currentCrawledData = data.products;
                     document.getElementById('crawl-count').textContent = data.count;
@@ -1830,10 +1847,8 @@
 
                     data.products.forEach((prod, index) => {
                         const imgUrl = prod.image_url || prod.image || 'https://via.placeholder.com/50';
-                        // Ưu tiên product_url, sau đó url (từ crawler), cuối cùng là shopee_link
                         const productLink = prod.product_url || prod.url || prod.shopee_link || '#';
                         const priceDisplay = prod.price ? prod.price.toLocaleString() + ' VND' : '0 VND';
-                        // Map về core clothing categories bạn định nghĩa (t_shirt, jeans, dress, ...)
                         const categoryDisplay = mapCrawlCategory(prod);
                         const displayName = prod.name && prod.name.length > 60 ? prod.name.substring(0, 60) + '...' : (prod.name || 'Unnamed');
 
@@ -1852,15 +1867,14 @@
 
                     resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } else {
-                    // Crawl thành công nhưng không có sản phẩm
-                    log(`[4/4] THÔNG BÁO: ${data.message || 'Không tìm thấy sản phẩm'}`, 'error');
-                    alert(`Crawl hoàn tất: ${data.message}`);
+                    log(`[4/4] NOTICE: ${data.message || 'No products found'}`, 'error');
+                    alert(`Crawl completed: ${data.message || 'No products found'}`);
                 }
 
             } catch (error) {
                 console.error('Crawl error:', error);
-                log(`❌ LỖI: ${error.message}`, 'error');
-                alert(`Crawl thất bại: ${error.message}\nKiểm tra console để biết thêm chi tiết.`);
+                log(`❌ ERROR: ${error.message}`, 'error');
+                alert(`Crawl failed: ${error.message}\nCheck console for more details.`);
             } finally {
                 btnStartCrawl.disabled = false;
                 btnStartCrawl.innerHTML = '<i class="fas fa-spider"></i> Start Crawling';
@@ -1889,10 +1903,21 @@
             saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
             try {
+                // Shop meta (optional but recommended)
+                const shopName = (document.getElementById('crawl-shop-name')?.value || '').trim();
+                const shopLinkInput = (document.getElementById('crawl-shop-link')?.value || '').trim();
+                // Fallback: use entered crawl URL as shop_link when nothing provided
+                const crawlUrlVal = (document.getElementById('crawl-url-input')?.value || '').trim();
+                const shopLink = shopLinkInput || crawlUrlVal;
+
                 const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/crawl/save`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ products: productsToSave })
+                    body: JSON.stringify({ 
+                        products: productsToSave,
+                        shop_name: shopName,
+                        shop_url: shopLink
+                    })
                 });
 
                 const data = await res.json();

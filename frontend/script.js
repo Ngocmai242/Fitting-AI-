@@ -299,8 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
     populateDateDropdowns();
 
     const toolRemove = document.getElementById('tool-remove-bg');
+    const toolChangeBg = document.getElementById('tool-change-bg');
     const toolRecolor = document.getElementById('tool-recolor');
     const toolUpscale = document.getElementById('tool-upscale');
+    const changeBgControls = document.getElementById('changebg-controls');
     const recolorControls = document.getElementById('recolor-controls');
     const upscaleControls = document.getElementById('upscale-controls');
     const fileRemove = document.getElementById('removebg-file');
@@ -320,6 +322,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const upscaleScale = document.getElementById('upscale-scale');
     const upscaleChoose = document.getElementById('upscale-choose');
     const upscaleOut = document.getElementById('upscale-output');
+    const changeBgFile = document.getElementById('changebg-file');
+    const changeBgBgFile = document.getElementById('changebg-bg-file');
+    const changeBgColor = document.getElementById('changebg-color');
+    const changeBgBlur = document.getElementById('changebg-blur');
+    const changeBgChooseImage = document.getElementById('changebg-choose-image');
+    const changeBgChooseBg = document.getElementById('changebg-choose-bg');
+    const changeBgOut = document.getElementById('changebg-output');
+    const changeBgFilePanel = document.getElementById('changebg-file-panel');
+    const changeBgFileName = document.getElementById('changebg-file-name');
+    const changeBgBgFileName = document.getElementById('changebg-bg-file-name');
+    const changeBgFileThumb = document.getElementById('changebg-file-thumb');
+    const changeBgBgThumb = document.getElementById('changebg-bg-thumb');
+    const changeBgConfirm = document.getElementById('changebg-confirm');
+    const changeBgCancel = document.getElementById('changebg-cancel');
+    let pendingChangeBgFile = null;
+    let pendingBgFile = null;
+    const navRemoveBg = document.getElementById('nav-remove-bg');
+    const navChangeBg = document.getElementById('nav-change-bg');
+    const navRecolor = document.getElementById('nav-recolor');
+    const navUpscale = document.getElementById('nav-upscale');
+    const navShopView = document.getElementById('nav-shop-view');
+    const navShopBuy = document.getElementById('nav-shop-buy');
     // Tool view switcher (simulate separate pages via ?tool=)
     function getToolParam() {
         const params = new URLSearchParams(window.location.search);
@@ -335,9 +359,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function showTool(tool) {
         const cards = {
             remove: document.getElementById('tool-remove-bg'),
+            changebg: document.getElementById('tool-change-bg'),
             recolor: document.getElementById('tool-recolor'),
             upscale: document.getElementById('tool-upscale')
         };
+        if (changeBgControls) changeBgControls.style.display = tool === 'changebg' ? 'flex' : 'none';
         if (recolorControls) recolorControls.style.display = tool === 'recolor' ? 'flex' : 'none';
         if (upscaleControls) upscaleControls.style.display = tool === 'upscale' ? 'flex' : 'none';
         const outRemove = document.getElementById('removebg-output');
@@ -362,6 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
             el.style.transform = active ? 'scale(1.02)' : 'scale(1)';
         };
         highlight(cards.remove, tool === 'remove');
+        highlight(cards.changebg, tool === 'changebg');
         highlight(cards.recolor, tool === 'recolor');
         highlight(cards.upscale, tool === 'upscale');
         if (tool) document.getElementById('tools')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -369,6 +396,99 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize from URL
     const initialTool = getToolParam();
     if (initialTool) showTool(initialTool);
+
+    // Nav dropdown bindings → open specific tool sections
+    if (navRemoveBg && fileRemove) {
+        navRemoveBg.addEventListener('click', (e) => {
+            e.preventDefault();
+            setToolParam('remove');
+            showTool('remove');
+            fileRemove.click();
+        });
+    }
+    if (navChangeBg) {
+        navChangeBg.addEventListener('click', (e) => {
+            e.preventDefault();
+            setToolParam('changebg');
+            showTool('changebg');
+        });
+    }
+    if (navRecolor) {
+        navRecolor.addEventListener('click', (e) => {
+            e.preventDefault();
+            setToolParam('recolor');
+            showTool('recolor');
+        });
+    }
+    if (navUpscale && upscaleFile) {
+        navUpscale.addEventListener('click', (e) => {
+            e.preventDefault();
+            setToolParam('upscale');
+            showTool('upscale');
+            // prompt file select for convenience
+            upscaleFile.click();
+        });
+    }
+
+    // Helpers for Shop dropdown
+    async function ensureShopReady() {
+        scrollToSection('shop');
+        try { await loadShopItems(); } catch(e) {}
+        return new Promise((resolve) => {
+            let tries = 0;
+            const timer = setInterval(() => {
+                const grid = document.getElementById('shop-grid-container');
+                const shopsRow = document.getElementById('shops-row');
+                if (grid && shopsRow && shopsRow.children.length > 0) {
+                    clearInterval(timer);
+                    resolve({ grid, shopsRow });
+                }
+                if (++tries > 40) { // ~10s max
+                    clearInterval(timer);
+                    resolve({ grid, shopsRow });
+                }
+            }, 250);
+        });
+    }
+    function clickAllShops(shopsRow) {
+        if (!shopsRow) return;
+        const btns = shopsRow.querySelectorAll('button.btn');
+        for (const b of btns) {
+            if ((b.textContent || '').trim().toLowerCase() === 'all shops') {
+                b.click();
+                return;
+            }
+        }
+        // fallback: click first shop
+        if (btns.length) btns[0].click();
+    }
+    if (navShopView) {
+        navShopView.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const { grid, shopsRow } = await ensureShopReady();
+            clickAllShops(shopsRow);
+            const st = document.getElementById('shop-title');
+            if (st) st.innerText = 'View Price & Details';
+            grid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+    if (navShopBuy) {
+        navShopBuy.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const { grid, shopsRow } = await ensureShopReady();
+            clickAllShops(shopsRow);
+            const st = document.getElementById('shop-title');
+            if (st) st.innerText = 'Buy Now';
+            setTimeout(() => {
+                const buyLink = grid?.querySelector('a.btn.btn-secondary[href]');
+                if (buyLink) {
+                    window.open(buyLink.href, '_blank');
+                } else {
+                    grid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 500);
+        });
+    }
 
     if (toolRemove && fileRemove && outRemove) {
         toolRemove.addEventListener('click', () => {
@@ -487,6 +607,43 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    async function runChangeBgWithFiles(subjectBlob, backgroundBlob) {
+        const origUrl = URL.createObjectURL(subjectBlob);
+        if (changeBgOut) changeBgOut.innerHTML = '<div style="padding:12px; color:#666;">Processing...</div>';
+        const fd = new FormData();
+        fd.append('image', subjectBlob, 'input.png');
+        const blurVal = (changeBgBlur && changeBgBlur.value) ? changeBgBlur.value : '0';
+        fd.append('blur', blurVal);
+        if (backgroundBlob) {
+            fd.append('bg_image', backgroundBlob, 'bg.png');
+        } else {
+            fd.append('bg_color', (changeBgColor && changeBgColor.value) ? changeBgColor.value : '#ffffff');
+        }
+        const res = await fetch(`${API_URL}/change-bg`, { method: 'POST', body: fd });
+        if (!res.ok) {
+            const txt = await res.text();
+            if (changeBgOut) changeBgOut.innerHTML = `<div style="padding:12px; color:#e57373;">${txt}</div>`;
+            return;
+        }
+        const outBlob = await res.blob();
+        const url = URL.createObjectURL(outBlob);
+        if (changeBgOut) {
+            changeBgOut.innerHTML = `
+                <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:240px;">
+                        <div style="font-weight:600; margin-bottom:6px;">Original</div>
+                        <img src="${origUrl}" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                    </div>
+                    <div style="flex:1; min-width:240px;">
+                        <div style="font-weight:600; margin-bottom:6px;">Background Changed</div>
+                        <img src="${url}" style="max-width:100%; border-radius:8px; border:1px solid #eee;">
+                        <div style="margin-top:8px;"><a href="${url}" download="changed_bg.png" class="btn btn-secondary" style="width:auto;">Download</a></div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     if (toolRecolor && recolorFile && recolorColor && recolorOut && recolorChoose) {
         toolRecolor.addEventListener('click', () => {
             setToolParam('recolor');
@@ -521,6 +678,75 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (recolorFilePanel) recolorFilePanel.style.display = 'none';
                 if (recolorFileName) recolorFileName.textContent = '';
                 recolorFile.value = '';
+            });
+        }
+    }
+
+    if (toolChangeBg && changeBgControls) {
+        toolChangeBg.addEventListener('click', () => {
+            setToolParam('changebg');
+            showTool('changebg');
+        });
+        if (changeBgChooseImage && changeBgFile) {
+            changeBgChooseImage.addEventListener('click', () => changeBgFile.click());
+        }
+        if (changeBgChooseBg && changeBgBgFile) {
+            changeBgChooseBg.addEventListener('click', () => changeBgBgFile.click());
+        }
+        if (changeBgFile) {
+            changeBgFile.addEventListener('change', (e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                pendingChangeBgFile = f;
+                if (changeBgFilePanel) {
+                    changeBgFilePanel.style.display = 'block';
+                    if (changeBgFileName) changeBgFileName.innerHTML = `<i class="fas fa-user"></i> Image: ${f.name}`;
+                    if (changeBgFileThumb) {
+                        const url = URL.createObjectURL(f);
+                        changeBgFileThumb.src = url;
+                        changeBgFileThumb.onload = () => URL.revokeObjectURL(url);
+                    }
+                }
+            });
+        }
+        if (changeBgBgFile) {
+            changeBgBgFile.addEventListener('change', (e) => {
+                const f = e.target.files && e.target.files[0];
+                pendingBgFile = f || null;
+                if (changeBgFilePanel && f) {
+                    changeBgFilePanel.style.display = 'block';
+                    if (changeBgBgFileName) changeBgBgFileName.innerHTML = `<i class="fas fa-image"></i> Background: ${f.name}`;
+                    if (changeBgBgThumb) {
+                        const url = URL.createObjectURL(f);
+                        changeBgBgThumb.src = url;
+                        changeBgBgThumb.onload = () => URL.revokeObjectURL(url);
+                    }
+                }
+            });
+        }
+        if (changeBgConfirm) {
+            changeBgConfirm.addEventListener('click', async () => {
+                if (!pendingChangeBgFile) return;
+                await runChangeBgWithFiles(pendingChangeBgFile, pendingBgFile);
+                pendingChangeBgFile = null;
+                pendingBgFile = null;
+                if (changeBgFilePanel) changeBgFilePanel.style.display = 'none';
+                if (changeBgFile) changeBgFile.value = '';
+                if (changeBgBgFile) changeBgBgFile.value = '';
+            });
+        }
+        if (changeBgCancel) {
+            changeBgCancel.addEventListener('click', () => {
+                pendingChangeBgFile = null;
+                pendingBgFile = null;
+                if (changeBgFilePanel) changeBgFilePanel.style.display = 'none';
+                if (changeBgFileName) changeBgFileName.innerHTML = `<i class="fas fa-user"></i> Image`;
+                if (changeBgBgFileName) changeBgBgFileName.innerHTML = `<i class="fas fa-image"></i> Background`;
+                if (changeBgFile) changeBgFile.value = '';
+                if (changeBgBgFile) changeBgBgFile.value = '';
+                if (changeBgOut) changeBgOut.innerHTML = '';
+                if (changeBgFileThumb) changeBgFileThumb.src = '';
+                if (changeBgBgThumb) changeBgBgThumb.src = '';
             });
         }
     }

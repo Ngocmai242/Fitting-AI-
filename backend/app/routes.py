@@ -30,7 +30,7 @@ from .models import (
 from .ai.pose import extract_keypoints
 from .ai.features import compute_ratios, estimate_gender
 from .ai.classifier import predict_shape, predict_shape_with_confidence
-from .ai.image_tools import remove_background_rgba, recolor_clothing, upscale_image
+from .ai.image_tools import remove_background_rgba, recolor_clothing, upscale_image, change_background
 import json as _json
 
 # Add project root to path to import data_engine
@@ -910,6 +910,22 @@ def api_recolor():
         return Response(out_b, mimetype=mime)
     except Exception as e:
         return jsonify({'message': f'recolor error: {str(e)}'}), 500
+
+@main_bp.route('/api/change-bg', methods=['POST'])
+def api_change_bg():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'message': 'image required'}), 400
+        img_b = request.files['image'].read()
+        blur = float(request.form.get('blur') or request.args.get('blur') or 0.0)
+        bg_b = None
+        if 'bg_image' in request.files:
+            bg_b = request.files['bg_image'].read()
+        bg_color = request.form.get('bg_color') or request.args.get('bg_color') or '#ffffff'
+        out_b, mime = change_background(img_b, bg_color, bg_b, blur)
+        return Response(out_b, mimetype=mime)
+    except Exception as e:
+        return jsonify({'message': f'change_bg error: {str(e)}'}), 500
 
 @main_bp.route('/api/upscale', methods=['POST'])
 def api_upscale():

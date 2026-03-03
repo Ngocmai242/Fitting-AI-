@@ -52,10 +52,10 @@
                 <a href="#tools" onclick="scrollToSection('tools')"><span>Image Tools</span> <i
                         class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 5px;"></i></a>
                 <div class="nav-dropdown">
-                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-eraser"></i> Remove Background</a>
-                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-image"></i> Change Background</a>
-                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-palette"></i> Recolor Outfit</a>
-                    <a href="#" onclick="scrollToSection('tools')"><i class="fas fa-magic"></i> Upscale Image</a>
+                    <a id="nav-remove-bg" href="#" onclick="scrollToSection('tools')"><i class="fas fa-eraser"></i> Remove Background</a>
+                    <a id="nav-change-bg" href="#" onclick="scrollToSection('tools')"><i class="fas fa-image"></i> Change Background</a>
+                    <a id="nav-recolor" href="#" onclick="scrollToSection('tools')"><i class="fas fa-palette"></i> Recolor Outfit</a>
+                    <a id="nav-upscale" href="#" onclick="scrollToSection('tools')"><i class="fas fa-magic"></i> Upscale Image</a>
                 </div>
             </div>
 
@@ -64,10 +64,8 @@
                 <a href="#shop" onclick="scrollToSection('shop')"><span>Shop</span> <i class="fas fa-chevron-down"
                         style="font-size: 0.7rem; margin-left: 5px;"></i></a>
                 <div class="nav-dropdown">
-                    <a href="#" onclick="scrollToSection('shop')"><i class="fas fa-search-dollar"></i> View Price &
+                    <a id="nav-shop-view" href="#" onclick="scrollToSection('shop')"><i class="fas fa-search-dollar"></i> View Price &
                         Details</a>
-                    <a href="#" onclick="scrollToSection('shop')"><i class="fas fa-shopping-cart"></i> Buy Now
-                        (Shopee/Web)</a>
                 </div>
             </div>
 
@@ -293,7 +291,7 @@
             <!-- C. Shop Links -->
             <section id="shop" style="margin-bottom: 4rem; padding: 0 2rem;">
                 <div style="max-width: 1200px; margin: 0 auto;">
-                    <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
+                    <h2 id="shop-title" class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;"><span
                             style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>Shop
                         The Look</h2>
                     <div id="shops-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
@@ -318,6 +316,10 @@
                             <i class="fas fa-eraser" style="font-size: 2rem; color: var(--pastel-pink);"></i>
                             <h4>Remove BG</h4>
                         </div>
+                        <div class="tool-card" id="tool-change-bg">
+                            <i class="fas fa-image" style="font-size: 2rem; color: var(--pastel-blue);"></i>
+                            <h4>Change BG</h4>
+                        </div>
                         <div class="tool-card" id="tool-recolor">
                             <i class="fas fa-paint-brush" style="font-size: 2rem; color: var(--pastel-blue);"></i>
                             <h4>Recolor</h4>
@@ -330,6 +332,30 @@
                     <div style="margin-top:12px;">
                         <input type="file" id="removebg-file" accept="image/*" style="display:none;">
                         <div id="removebg-output" style="margin-top:16px;"></div>
+                        <div id="changebg-controls" class="tool-controls" style="display:none; margin-top:16px;">
+                            <input type="color" id="changebg-color" value="#ffffff" title="Background color" style="width:40px; height:40px; padding:0; border:none;">
+                            <label>Blur</label>
+                            <input type="range" id="changebg-blur" min="0" max="6" step="0.5" value="0" style="width:120px;">
+                            <button class="btn btn-secondary" id="changebg-choose-image">Choose Image</button>
+                            <button class="btn" id="changebg-choose-bg">Choose Background</button>
+                            <input type="file" id="changebg-file" accept="image/*" style="display:none;">
+                            <input type="file" id="changebg-bg-file" accept="image/*" style="display:none;">
+                        </div>
+                        <div id="changebg-file-panel" class="tool-panel">
+                            <div class="preview-row">
+                                <img id="changebg-file-thumb" class="thumb" alt="Image thumb">
+                                <span id="changebg-file-name" class="chip chip-subject"><i class="fas fa-user"></i> Image</span>
+                            </div>
+                            <div class="preview-row" style="margin-top:8px;">
+                                <img id="changebg-bg-thumb" class="thumb" alt="Background thumb">
+                                <span id="changebg-bg-file-name" class="chip chip-bg"><i class="fas fa-image"></i> Background</span>
+                            </div>
+                            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+                                <button class="btn btn-primary" id="changebg-confirm">Confirm</button>
+                                <button class="btn" id="changebg-cancel" style="background:#eee;">Cancel</button>
+                            </div>
+                        </div>
+                        <div id="changebg-output" class="tool-output"></div>
                         <div id="recolor-controls" style="display:none; margin-top:16px;">
                             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                                 <input type="color" id="recolor-color" value="#ff6b6b" style="width:40px; height:40px; padding:0; border:none;">

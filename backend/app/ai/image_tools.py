@@ -487,3 +487,53 @@ def upscale_image(image_bytes: bytes, scale: int = 2) -> Tuple[bytes, str]:
     buf = io.BytesIO()
     out_img.save(buf, format="PNG", optimize=True)
     return buf.getvalue(), "image/png"
+
+
+def change_background(
+    image_bytes: bytes,
+    bg_color: str = "#ffffff",
+    background_image_bytes: bytes = None,
+    blur: float = 0.0
+) -> Tuple[bytes, str]:
+    """
+    Change background by compositing the extracted person over a color or image.
+    """
+    # Get person RGBA with refined alpha
+    rgba_bytes, _ = remove_background_rgba(image_bytes)
+    person = Image.open(io.BytesIO(rgba_bytes)).convert("RGBA")
+    w, h = person.size
+    # Build background
+    if background_image_bytes:
+        bg_img = Image.open(io.BytesIO(background_image_bytes)).convert("RGB")
+        bw, bh = bg_img.size
+        # Cover resize to match canvas
+        scale = max(w / float(bw), h / float(bh))
+        new_size = (int(bw * scale), int(bh * scale))
+        bg_resized = bg_img.resize(new_size, Image.Resampling.LANCZOS)
+        x0 = max(0, (bg_resized.size[0] - w) // 2)
+        y0 = max(0, (bg_resized.size[1] - h) // 2)
+        bg_cropped = bg_resized.crop((x0, y0, x0 + w, y0 + h))
+        if blur and blur > 0:
+            try:
+                import cv2  # type: ignore
+                np_bg = np.array(bg_cropped)[:, :, ::-1]
+                np_bg = cv2.GaussianBlur(np_bg, (0, 0), float(blur))
+                bg_cropped = Image.fromarray(np_bg[:, :, ::-1].astype(np.uint8))
+            except Exception:
+                bg_cropped = bg_cropped.filter(ImageFilter.GaussianBlur(radius=float(blur)))
+        background_rgba = bg_cropped.convert("RGBA")
+    else:
+        c = bg_color.strip()
+        if c.startswith("#"):
+            c = c[1:]
+        if len(c) == 3:
+            c = "".join([ch * 2 for ch in c])
+        r = int(c[0:2], 16)
+        g = int(c[2:4], 16)
+        b = int(c[4:6], 16)
+        background_rgba = Image.new("RGBA", (w, h), (r, g, b, 255))
+    # Composite
+    out = Image.alpha_composite(background_rgba, person)
+    buf = io.BytesIO()
+    out.save(buf, format="PNG", optimize=True)
+    return buf.getvalue(), "image/png"

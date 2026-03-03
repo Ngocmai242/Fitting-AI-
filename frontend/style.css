@@ -1003,6 +1003,61 @@ input:focus {
     background: white;
 }
 
+/* Tool Controls - simple, reusable */
+.tool-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.tool-controls .btn { width: auto; }
+.tool-panel {
+    display: none;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: 1px solid #eee;
+    background: #f9fafc;
+    border-radius: 8px;
+}
+.tool-output { margin-top: 12px; }
+
+/* Chips to distinguish subject vs background */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+}
+.chip-subject {
+    background: #eaf2ff;
+    color: #2f5fb0;
+    border-color: #cfe0ff;
+}
+.chip-bg {
+    background: #e9f6ea;
+    color: #2f8257;
+    border-color: #cdeed1;
+}
+.chip i { width: 16px; text-align: center; }
+
+/* Thumbnails for quick visual identification */
+.thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    object-fit: cover;
+    background: #fff;
+}
+.preview-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Profile Redesign - Account Information Card */
 #profile-view {
     position: fixed;

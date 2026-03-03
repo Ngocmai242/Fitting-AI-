@@ -303,6 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const toolRecolor = document.getElementById('tool-recolor');
     const toolUpscale = document.getElementById('tool-upscale');
     const changeBgControls = document.getElementById('changebg-controls');
+    const removeBgControls = document.getElementById('removebg-controls');
+    const removeBgChoose = document.getElementById('removebg-choose');
     const recolorControls = document.getElementById('recolor-controls');
     const upscaleControls = document.getElementById('upscale-controls');
     const fileRemove = document.getElementById('removebg-file');
@@ -364,22 +366,42 @@ document.addEventListener('DOMContentLoaded', () => {
             upscale: document.getElementById('tool-upscale')
         };
         if (changeBgControls) changeBgControls.style.display = tool === 'changebg' ? 'flex' : 'none';
+        if (removeBgControls) removeBgControls.style.display = tool === 'remove' ? 'flex' : 'none';
         if (recolorControls) recolorControls.style.display = tool === 'recolor' ? 'flex' : 'none';
         if (upscaleControls) upscaleControls.style.display = tool === 'upscale' ? 'flex' : 'none';
+        // Clear outputs of other tools to avoid mixing UIs/results
         const outRemove = document.getElementById('removebg-output');
-        const recolorOut = document.getElementById('recolor-output');
-        const upscaleOut = document.getElementById('upscale-output');
-        if (tool === 'recolor' || tool === 'upscale') {
+        const outChange = document.getElementById('changebg-output');
+        const outRecolor = document.getElementById('recolor-output');
+        const outUpscale = document.getElementById('upscale-output');
+        const fRemove = document.getElementById('removebg-file');
+        const fChange = document.getElementById('changebg-file');
+        const fChangeBg = document.getElementById('changebg-bg-file');
+        const fRecolor = document.getElementById('recolor-file');
+        const fUpscale = document.getElementById('upscale-file');
+        if (tool !== 'remove') {
             if (outRemove) outRemove.innerHTML = '';
-            const fileRemove = document.getElementById('removebg-file');
-            if (fileRemove) fileRemove.value = '';
+            if (fRemove) fRemove.value = '';
         }
-        if (tool === 'remove') {
-            if (recolorOut) recolorOut.innerHTML = '';
-            const recolorFile = document.getElementById('recolor-file');
+        if (tool !== 'changebg') {
+            if (outChange) outChange.innerHTML = '';
+            if (fChange) fChange.value = '';
+            if (fChangeBg) fChangeBg.value = '';
+            if (changeBgFilePanel) changeBgFilePanel.style.display = 'none';
+            if (changeBgFileName) changeBgFileName.innerHTML = `<i class="fas fa-user"></i> Image`;
+            if (changeBgBgFileName) changeBgBgFileName.innerHTML = `<i class="fas fa-image"></i> Background`;
+            if (changeBgFileThumb) changeBgFileThumb.src = '';
+            if (changeBgBgThumb) changeBgBgThumb.src = '';
+        }
+        if (tool !== 'recolor') {
+            if (outRecolor) outRecolor.innerHTML = '';
             if (recolorFile) recolorFile.value = '';
-            if (upscaleOut) upscaleOut.innerHTML = '';
-            const upscaleFile = document.getElementById('upscale-file');
+            if (recolorFilePanel) recolorFilePanel.style.display = 'none';
+            if (recolorFileName) recolorFileName.textContent = '';
+            pendingRecolorFile = null;
+        }
+        if (tool !== 'upscale') {
+            if (outUpscale) outUpscale.innerHTML = '';
             if (upscaleFile) upscaleFile.value = '';
         }
         const highlight = (el, active) => {
@@ -398,12 +420,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (initialTool) showTool(initialTool);
 
     // Nav dropdown bindings → open specific tool sections
-    if (navRemoveBg && fileRemove) {
+    if (navRemoveBg) {
         navRemoveBg.addEventListener('click', (e) => {
             e.preventDefault();
             setToolParam('remove');
             showTool('remove');
-            fileRemove.click();
         });
     }
     if (navChangeBg) {
@@ -490,12 +511,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (toolRemove && fileRemove && outRemove) {
+    if (toolRemove && outRemove) {
         toolRemove.addEventListener('click', () => {
             setToolParam('remove');
             showTool('remove');
-            fileRemove.click();
         });
+        if (removeBgChoose && fileRemove) {
+            removeBgChoose.addEventListener('click', () => fileRemove.click());
+        }
         fileRemove.addEventListener('change', async (e) => {
             const f = e.target.files && e.target.files[0];
             if (!f) return;

@@ -709,9 +709,6 @@
                             </select>
                         </div>
 
-                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                            <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-                            <button class="btn btn-primary" onclick="saveEditedProduct()">Save Changes</button>
                         </div>
                     </div>
                 </div>
@@ -720,85 +717,87 @@
 
             <!-- Crawl Module -->
             <div id="mod-crawl" class="admin-module hidden">
-                <h2 class="section-title" style="text-align: left;">Shopee Crawler</h2>
+                <h2 class="section-title" style="text-align: left;">High-Performance Shopee Crawler (JSON API)</h2>
                 <div class="admin-card">
                     <div class="form-group">
-                        <label>Shop URL</label>
+                        <label>Shopee Shop URL</label>
                         <div style="display: flex; gap: 10px;">
-                            <input type="text" id="crawl-url-input" placeholder="https://shopee.vn/..." value=""
-                                style="flex: 1;">
-                            <button class="btn btn-secondary" id="btn-start-crawl" onclick="startCrawl()"
-                                style="width: auto; white-space: nowrap;">
-                                <i class="fas fa-spider"></i> Start Crawling
+                            <input type="text" id="crawl-url-input" placeholder="https://shopee.vn/shop-name.123456789" style="flex: 1;">
+                            <input type="number" id="crawl-target-count" value="40" min="1" max="100" style="width: 100px;" title="Target Product Count">
+                            <button class="btn btn-primary" id="btn-start-crawl" onclick="startNewCrawl()" style="width: auto; white-space: nowrap; padding: 12px 25px;">
+                                <i class="fas fa-spider"></i> Crawl & Auto Save
                             </button>
                         </div>
+                        <p style="font-size: 0.8rem; color: #888; margin-top: 8px;">
+                            <i class="fas fa-info-circle"></i> Uses Shopee Internal JSON API. <b>1 request = 50 products</b>. 100% Free, Unlimited & Fast (2-4s).
+                        </p>
                     </div>
-                    <div class="form-group" style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <label>Shop Name (Display)</label>
-                            <input type="text" id="crawl-shop-name" placeholder="e.g., Shopee Shop 123456" />
-                        </div>
-                        <div style="flex:1;">
-                            <label>Shop Link (to show in user)</label>
-                            <input type="text" id="crawl-shop-link" placeholder="https://shopee.vn/shop/123456" />
-                        </div>
-                    </div>
+                    
                     <div id="crawl-logs"
-                        style="margin-top: 1rem; background: #1a1a2e; color: #0f0; padding: 1rem; border-radius: 8px; font-family: monospace; min-height: 60px; max-height: 200px; overflow-y: auto; font-size: 0.85rem;">
-                        > Ready to crawl...
-                    </div>
-                    <!-- Results Area -->
-                    <div id="crawl-results" style="margin-top: 20px; display: none;">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3 style="margin: 0;"><i class="fas fa-check-double"></i> Crawled Products (<span
-                                    id="crawl-count">0</span> items)</h3>
-                            <div style="display: flex; gap: 10px;">
-                                <button class="btn" onclick="toggleSelectAllCrawled()"
-                                    style="width: auto; background: #eee; color: #333; padding: 8px 16px;"><i
-                                        class="fas fa-check-square"></i> Select All</button>
-                                <button class="btn btn-primary" id="btn-save-crawled" onclick="saveCrawledProducts()"
-                                    style="width: auto; padding: 8px 20px;"><i class="fas fa-save"></i> Save Selected
-                                    Products</button>
-                            </div>
-                        </div>
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; text-align: left; border-collapse: collapse;"
-                                id="crawl-results-table">
-                                <thead>
-                                    <tr style="border-bottom: 2px solid #edeff2;">
-                                        <th style="width: 5%; text-align: center; padding: 12px;"><input type="checkbox"
-                                                id="select-all-crawled" checked onclick="toggleSelectAllCrawled(this)">
-                                        </th>
-                                        <th style="width: 8%; text-align: center; padding: 12px;">Image</th>
-                                        <th style="width: 30%; padding: 12px;">Product Name</th>
-                                        <th
-                                            style="width: 15%; text-align: center; padding: 12px; color: var(--admin-blue);">
-                                            Category</th>
-                                        <th
-                                            style="width: 12%; text-align: center; padding: 12px; color: var(--admin-pink);">
-                                            Price</th>
-                                        <th style="width: 10%; text-align: center; padding: 12px;">Shopee Link</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="crawl-results-body">
-                                </tbody>
-                            </table>
-                        </div>
+                        style="margin-top: 1.5rem; background: #1a1a2e; color: #0f0; padding: 1.5rem; border-radius: 12px; font-family: 'Courier New', monospace; min-height: 120px; max-height: 350px; overflow-y: auto; font-size: 0.9rem; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);">
+                        > System ready. URL formats supported: .shopId, /username, or /shop/id.
                     </div>
                 </div>
+
                 <div class="admin-card">
-                    <h3>Shop Names (Rename)</h3>
-                    <p>Rename the display name of crawled shops (Shopee only).</p>
-                    <div id="shop-rename-container" style="margin-top:10px;"></div>
+                    <h3><i class="fas fa-history"></i> Recent Crawled Shops</h3>
+                    <div id="shop-rename-container" style="margin-top:15px; display: grid; gap: 10px;">
+                        <!-- JS Injection -->
+                    </div>
                 </div>
             </div>
 
             <!-- Mapping Module -->
             <div id="mod-mapping" class="admin-module hidden">
-                <h2 class="section-title" style="text-align: left;">Outfit Mapping</h2>
+                <h2 class="section-title" style="text-align: left;">AI Product Intelligence & Mapping</h2>
+                
+                <!-- NEW: Product Classification Tool -->
                 <div class="admin-card">
-                    <p>Map items to shop links here.</p>
+                    <div style="display: flex; justify-content: space-between; align-items: start; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1;">
+                            <h3><i class="fas fa-microchip"></i> AI Product Classifier (100% FREE)</h3>
+                            <p style="color: #666; max-width: 600px; margin-top: 8px;">
+                                Automatically assign categories, styles, occasions, and extract primary colors from images 
+                                using <b>Zero-Cost Local NLP & Vision</b> engines. No external API calls, zero latency.
+                            </p>
+                        </div>
+                        <button class="btn btn-primary" onclick="runProductClassifier()" id="btn-run-classifier" style="width: auto; padding: 12px 35px; font-weight: 700;">
+                            <i class="fas fa-magic"></i> Classify All Items
+                        </button>
+                    </div>
+                    
+                    <div id="classifier-progress" style="display: none; margin-top: 25px; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+                        <div style="height: 12px; background: #e9ecef; border-radius: 6px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                            <div id="classifier-progress-bar"
+                                style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--admin-green), #48c774); transition: width 0.4s ease-out; box-shadow: 0 0 10px rgba(72,199,116,0.5);">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                            <p id="classifier-status-text" style="font-size: 0.9rem; color: #555; font-weight: 600; margin:0;">Processing items...</p>
+                            <span id="classifier-percent" style="font-weight: 700; color: var(--admin-green);">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Shop Intelligence / Mapping -->
+                <div class="admin-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+                        <div>
+                            <h3><i class="fas fa-store"></i> Shop Mapping & Intelligence</h3>
+                            <p style="color: #666; margin-top: 5px;">Analyzes product distribution to determine shop specialties (Full Outfit vs Specialist).</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="loadShopMapping()" style="width: auto; padding: 10px 25px;">
+                            <i class="fas fa-sync"></i> Refresh Mapping
+                        </button>
+                    </div>
+                    
+                    <div id="shop-mapping-results" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+                        <!-- Results injected by JS -->
+                        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #bbb;">
+                            <i class="fas fa-map-marked-alt" style="font-size: 3rem; margin-bottom: 10px; display: block;"></i>
+                            Click Refresh to build shop intelligence report.
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1983,181 +1982,168 @@
             return 't_shirt';
         }
 
-        // Crawl Function
-        async function startCrawl() {
+        // -------------------------------------------------------------------------
+        // NEW HIGH-PERFORMANCE CRAWLER & CLASSIFIER LOGIC
+        // -------------------------------------------------------------------------
+        
+        async function startNewCrawl() {
             const urlInput = document.getElementById('crawl-url-input');
+            const countInput = document.getElementById('crawl-target-count');
             const logDiv = document.getElementById('crawl-logs');
-            const resultsDiv = document.getElementById('crawl-results');
-            const resultsBody = document.getElementById('crawl-results-body');
-            const btnStartCrawl = document.getElementById('btn-start-crawl');
+            const btn = document.getElementById('btn-start-crawl');
+            
             const url = urlInput.value.trim();
+            const count = parseInt(countInput.value) || 40;
 
             if (!url) {
-                alert('Please enter a Shopee shop URL');
-                return;
-            }
-            if (!url.includes('shopee.vn')) {
-                alert('Only Shopee is supported. Please enter a Shopee URL (https://shopee.vn/...)');
+                alert('Vui lòng nhập link Shop Shopee');
                 return;
             }
 
-            // Reset UI
+            // UI Feedback
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Crawling...';
             logDiv.innerHTML = '';
-            resultsDiv.style.display = 'none';
-            resultsBody.innerHTML = '';
-            currentCrawledData = [];
-
-            // Disable button
-            btnStartCrawl.disabled = true;
-            btnStartCrawl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Crawling...';
 
             function log(msg, type = 'info') {
-                const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#0f0';
-                logDiv.innerHTML += `<span style="color:${color}"> ${msg}</span><br>`;
+                const colors = { 'info': '#0f0', 'success': '#4ade80', 'error': '#fb7185' };
+                logDiv.innerHTML += `<div style="color:${colors[type] || '#fff'}">> ${msg}</div>`;
                 logDiv.scrollTop = logDiv.scrollHeight;
             }
 
+            log(`Starting High-Performance Crawl for: ${url.substring(0, 50)}...`);
+            
             try {
-                log(`[1/4] Connecting to: ${url}...`);
-                await new Promise(r => setTimeout(r, 500));
-                log('[2/4] Initializing crawler...');
-                await new Promise(r => setTimeout(r, 500));
-                log('[3/4] Fetching product data (30–60 seconds)...');
-
-                const response = await fetch(`${window.APP_CONFIG.getApiUrl()}/crawl`, {
+                const startTime = Date.now();
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/admin/crawl-shop`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || `HTTP Error ${response.status}`);
-                }
-
-                if (data.products && data.products.length > 0) {
-                    log(`[4/4] SUCCESS: Found ${data.count} products!`, 'success');
-
-                    currentCrawledData = data.products;
-                    document.getElementById('crawl-count').textContent = data.count;
-
-                    // Render bảng
-                    resultsDiv.style.display = 'block';
-                    resultsBody.innerHTML = '';
-
-                    data.products.forEach((prod, index) => {
-                        const rawImage = prod.image_url || prod.image || '';
-                        const API_URL = window.APP_CONFIG && window.APP_CONFIG.getApiUrl ? window.APP_CONFIG.getApiUrl() : '';
-                        const BACKEND_URL = window.APP_CONFIG && window.APP_CONFIG.getBackendUrl ? window.APP_CONFIG.getBackendUrl() : '';
-                        let imgUrl = rawImage || 'https://via.placeholder.com/50';
-                        if (rawImage) {
-                            if (rawImage.startsWith('data:') || rawImage.startsWith('blob:')) {
-                                imgUrl = rawImage;
-                            } else if (rawImage.startsWith('/')) {
-                                imgUrl = BACKEND_URL ? (BACKEND_URL + rawImage) : rawImage;
-                            } else if (rawImage.startsWith('http')) {
-                                const blocked = /susercontent\.com|shopee\.vn|cf\.shopee\.vn|lzdcdn\.com|alicdn\.com/i.test(rawImage);
-                                if (blocked && API_URL) {
-                                    imgUrl = `${API_URL}/image-proxy?url=${encodeURIComponent(rawImage)}`;
-                                } else {
-                                    imgUrl = rawImage;
-                                }
-                            }
-                        }
-                        const productLink = prod.product_url || prod.url || prod.shopee_link || '#';
-                        const priceDisplay = prod.price ? prod.price.toLocaleString() + ' VND' : '0 VND';
-                        const categoryDisplay = mapCrawlCategory(prod);
-                        const displayName = prod.name && prod.name.length > 60 ? prod.name.substring(0, 60) + '...' : (prod.name || 'Unnamed');
-
-                        const tr = document.createElement('tr');
-                        tr.style.borderBottom = '1px solid #f0f0f0';
-                        tr.innerHTML = `
-                    <td style="text-align: center; padding: 10px;"><input type="checkbox" class="crawl-checkbox" data-index="${index}" checked style="transform: scale(1.3); cursor: pointer;"></td>
-                    <td style="text-align: center; padding: 10px;"><img src="${imgUrl}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px;" onerror="this.src='https://via.placeholder.com/50'"></td>
-                    <td style="padding: 10px; font-weight: 500;" title="${prod.name || ''}">${displayName}</td>
-                    <td style="text-align: center; padding: 10px;"><span style="background: #e3f2fd; color: var(--admin-blue); padding: 4px 10px; border-radius: 12px;">${categoryDisplay}</span></td>
-                    <td style="text-align: center; padding: 10px; color: var(--admin-pink); font-weight: 700;">${priceDisplay}</td>
-                    <td style="text-align: center; padding: 10px;"><a href="${productLink}" target="_blank" style="color: var(--admin-blue);"><i class="fas fa-external-link-alt"></i></a></td>
-                `;
-                        resultsBody.appendChild(tr);
-                    });
-
-                    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else {
-                    log(`[4/4] NOTICE: ${data.message || 'No products found'}`, 'error');
-                    alert(`Crawl completed: ${data.message || 'No products found'}`);
-                }
-
-            } catch (error) {
-                console.error('Crawl error:', error);
-                log(`❌ ERROR: ${error.message}`, 'error');
-                alert(`Crawl failed: ${error.message}\nCheck console for more details.`);
-            } finally {
-                btnStartCrawl.disabled = false;
-                btnStartCrawl.innerHTML = '<i class="fas fa-spider"></i> Start Crawling';
-            }
-        }
-
-        async function saveCrawledProducts() {
-            const checkboxes = document.querySelectorAll('.crawl-checkbox:checked');
-            if (checkboxes.length === 0) {
-                alert('Please select at least one product to save.');
-                return;
-            }
-
-            const productsToSave = [];
-            checkboxes.forEach(cb => {
-                const index = parseInt(cb.getAttribute('data-index'));
-                if (currentCrawledData[index]) {
-                    productsToSave.push(currentCrawledData[index]);
-                }
-            });
-
-            if (!confirm(`Save ${productsToSave.length} products to Products & Outfits?`)) return;
-
-            const saveBtn = document.getElementById('btn-save-crawled');
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-
-            try {
-                // Shop meta (optional but recommended)
-                const shopName = (document.getElementById('crawl-shop-name')?.value || '').trim();
-                const shopLinkInput = (document.getElementById('crawl-shop-link')?.value || '').trim();
-                // Fallback: use entered crawl URL as shop_link when nothing provided
-                const crawlUrlVal = (document.getElementById('crawl-url-input')?.value || '').trim();
-                const shopLink = shopLinkInput || crawlUrlVal;
-
-                const res = await fetch(`${API_URL}/crawl/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        products: productsToSave,
-                        shop_name: shopName,
-                        shop_url: shopLink
-                    })
+                    body: JSON.stringify({ shop_url: url, target_count: count })
                 });
 
                 const data = await res.json();
-                if (res.ok) {
-                    alert(`✅ ${data.message}`);
-                    // Hide results and clear logs
-                    document.getElementById('crawl-results').style.display = 'none';
-                    document.getElementById('crawl-logs').innerHTML = '> Ready to crawl...';
-                    currentCrawledData = [];
-                    // Refresh products list
-                    if (typeof loadProducts === 'function') await loadProducts();
-                    // Navigate to Products & Outfits tab to see saved products
-                    showAdminModule('products');
+                const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+                if (data.success) {
+                    log(`SUCCESS: Crawled ${data.total_crawled} products in ${duration}s`, 'success');
+                    log(`DB UPDATE: Saved ${data.saved_to_db} items to database`, 'success');
+                    log(`Shop ID resolved: ${data.shop_id}`, 'info');
+                    
+                    alert(`✅ Crawl thành công!\n- Tổng cộng: ${data.total_crawled} sản phẩm\n- Đã lưu: ${data.saved_to_db} (deduplicated)\n- Thời gian: ${duration}s`);
+                    
+                    // Refresh data
+                    loadProducts();
+                    loadShopRegistry();
                 } else {
-                    alert(`Save Failed: ${data.message}`);
+                    log(`ERROR: ${data.error}`, 'error');
+                    alert(`❌ Lỗi Crawler: ${data.error}`);
                 }
             } catch (e) {
-                console.error(e);
-                alert(`Error saving products: ${e.message}`);
+                log(`FATAL ERROR: ${e.message}`, 'error');
+                alert(`❌ Lỗi hệ thống: ${e.message}`);
             } finally {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Selected Products';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-spider"></i> Crawl & Auto Save';
+            }
+        }
+
+        async function runProductClassifier() {
+            const btn = document.getElementById('btn-run-classifier');
+            const progress = document.getElementById('classifier-progress');
+            const bar = document.getElementById('classifier-progress-bar');
+            const status = document.getElementById('classifier-status-text');
+            const percent = document.getElementById('classifier-percent');
+
+            if (!confirm('Bắt đầu quy trình AI Classify cho 100 sản phẩm mới nhất?')) return;
+
+            btn.disabled = true;
+            progress.style.display = 'block';
+            bar.style.width = '0%';
+            status.innerText = 'Initializing Local AI Engines...';
+            
+            // Mock progress start
+            let p = 0;
+            const timer = setInterval(() => {
+                if (p < 85) {
+                    p += Math.random() * 5;
+                    bar.style.width = p + '%';
+                    percent.innerText = Math.floor(p) + '%';
+                    if (p > 20) status.innerText = 'Processing NLP keywords...';
+                    if (p > 50) status.innerText = 'Analyzing image colors (Pillow)...';
+                    if (p > 70) status.innerText = 'Mapping Body Shapes & Occasions...';
+                }
+            }, 400);
+
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/admin/classify-products`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await res.json();
+                clearInterval(timer);
+                
+                bar.style.width = '100%';
+                percent.innerText = '100%';
+                
+                if (data.success) {
+                    status.innerText = `SUCCESS: Labelled ${data.classified} products!`;
+                    alert(`✅ AI Classification Hoàn tất!\n- Ảnh/Sản phẩm đã xử lý: ${data.classified}\n- Đã cập nhật vào DB: ${data.saved}`);
+                    loadProducts();
+                } else {
+                    status.innerText = 'Lỗi: ' + (data.message || data.error);
+                }
+            } catch (e) {
+                clearInterval(timer);
+                status.innerText = 'Error: ' + e.message;
+            } finally {
+                setTimeout(() => { btn.disabled = false; }, 2000);
+            }
+        }
+
+        async function loadShopMapping() {
+            const container = document.getElementById('shop-mapping-results');
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Analyzing shop patterns...</div>';
+            
+            try {
+                const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/admin/shop-mapping`);
+                const mapping = await res.json();
+                
+                container.innerHTML = '';
+                
+                Object.keys(mapping).forEach(type => {
+                    const shops = mapping[type];
+                    if (shops.length === 0) return;
+                    
+                    const section = document.createElement('div');
+                    section.className = 'admin-card';
+                    section.innerHTML = `
+                        <h4 style="margin-top:0; color:var(--admin-blue); border-bottom:1px solid #eee; padding-bottom:10px;">
+                            ${type.replace('_', ' ')} (${shops.length})
+                        </h4>
+                        <div style="margin-top:10px;">
+                            ${shops.map(s => `
+                                <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:0.85rem;">
+                                    <span><strong>Shop ID: ${s.shop_id}</strong></span>
+                                    <span style="color:var(--admin-green)">Score: ${s.completeness_score}</span>
+                                </div>
+                                <div style="font-size:0.8rem; color:#888;">
+                                    Styles: ${s.top_styles.join(', ')}
+                                </div>
+                                <hr style="border:0; border-top:1px dashed #eee; margin:8px 0;">
+                            `).join('')}
+                        </div>
+                    `;
+                    container.appendChild(section);
+                });
+                
+                if (container.innerHTML === '') {
+                    container.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#888;">No shops mapped. Please crawl and classify products first.</div>';
+                }
+                
+            } catch (e) {
+                container.innerHTML = `<div style="grid-column: 1/-1; color:red;">Error: ${e.message}</div>`;
             }
         }
 

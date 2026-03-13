@@ -57,6 +57,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 # Import crawlers independently
 try:
+    from data_engine.shopee_crawler import crawl_shop as crawl_shopee_new, save_products_to_db
+    from data_engine.product_classifier import batch_classify, save_classifications, build_shop_profile, map_all_shops
+except ImportError as e:
+    print(f"Could not import new crawlers/classifiers: {e}")
+
+try:
     from data_engine.crawler.shopee import crawl_shop_url as crawl_shopee
 except ImportError as e:
     print(f"Could not import shopee crawler: {e}")
@@ -2115,3 +2121,70 @@ def ai_outfit_for_person():
         'occasion': occasion,
         'recommendations': recs
     }), 200
+# ──────────────────────────────────────────────────────────────────────────────
+# NEW ADMIN CRAWLER & CLASSIFIER ROUTES
+# ──────────────────────────────────────────────────────────────────────────────
+
+@main_bp.route('/api/admin/crawl-shop', methods=['POST'])
+def crawl_shopee_shop():
+    data = request.get_json()
+    shop_url = data.get('shop_url', '').strip()
+    target_count = data.get('target_count', 40)
+
+    if not shop_url:
+        return jsonify({'success': False, 'error': 'Thiếu shop_url'}), 400
+
+    try:
+        result = crawl_shopee_new(shop_url, target_count=target_count)
+        if result['success']:
+            saved = save_products_to_db(result['products'])
+            result['saved_to_db'] = saved
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/admin/classify-products', methods=['POST'])
+def classify_products_route():
+    data = request.get_json()
+    shop_id = data.get('shop_id')
+
+    # Lấy sản phẩm chưa classify từ DB
+    import sqlite3 as sql
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
+    
+    conn = sql.connect(db_path)
+    conn.row_factory = sql.Row
+    cursor = conn.cursor()
+    if shop_id:
+        cursor.execute("SELECT * FROM products WHERE shop_id=? AND classification IS NULL", (shop_id,))
+    else:
+        cursor.execute("SELECT * FROM products WHERE classification IS NULL LIMIT 100")
+    products = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    if not products:
+        return jsonify({'message': 'Không có sản phẩm nào cần classify', 'classified': 0, 'saved': 0})
+
+    try:
+        classified = batch_classify(products, analyze_images=True)
+        saved = save_classifications(classified)
+        return jsonify({'success': True, 'classified': len(classified), 'saved': saved})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/admin/shop-profile/<shop_id>')
+def get_shop_profile_route(shop_id):
+    try:
+        profile = build_shop_profile(shop_id)
+        return jsonify(profile)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/admin/shop-mapping')
+def get_shop_mapping_route():
+    try:
+        mapping = map_all_shops()
+        return jsonify(mapping)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -20,7 +20,6 @@ try:
 except ImportError:
     HAS_FEATURE_EXTRACTOR = False
 
-# --- Logger Setup ---
 logger = logging.getLogger("lazada.googlebot")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -55,7 +54,7 @@ class LazadaCrawler:
             try:
                 return json.loads(match.group(1))
             except: pass
-            
+
         # Try script type="application/ld+json"
         matches = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL)
         for m in matches:
@@ -64,7 +63,7 @@ class LazadaCrawler:
                 if isinstance(data, dict) and (data.get('@type') == 'ItemList' or 'itemListElement' in data):
                     return data
             except: pass
-            
+
         return None
 
     def _parse_items(self, html: str) -> List[Dict]:
@@ -77,14 +76,14 @@ class LazadaCrawler:
             for i in list_elements:
                 p = i.get('item', i)
                 if not p: continue
-                
+
                 name = p.get('name')
                 url = p.get('url')
                 image = p.get('image')
                 price_val = 0
                 if 'offers' in p:
                     price_val = float(p['offers'].get('price', 0))
-                
+
                 if name and url:
                     items.append({
                         "name": name,
@@ -113,19 +112,19 @@ class LazadaCrawler:
 
         results = []
         page_num = 1
-        
+
         while len(results) < self.limit:
             delim = "&" if "?" in target_url else "?"
             p_url = f"{target_url}{delim}page={page_num}"
             logger.info(f"📄 Page {page_num}...")
-            
+
             try:
                 resp = self.session.get(p_url, timeout=15)
                 if resp.status_code != 200: break
-                
+
                 page_items = self._parse_items(resp.text)
                 if not page_items: break
-                
+
                 new_added = 0
                 existing_ids = {r['itemid'] for r in results}
                 for item in page_items:
@@ -135,7 +134,7 @@ class LazadaCrawler:
                             try:
                                 ai = FeatureExtractor.extract(item['name']) or {}
                             except: pass
-                        
+
                         full_record = {
                             **item,
                             "category": ai.get("category", "Other"),
@@ -148,10 +147,10 @@ class LazadaCrawler:
                         }
                         results.append(full_record)
                         new_added += 1
-                
+
                 if new_added == 0: break
                 logger.info(f"📊 Added {new_added} items.")
-                
+
                 page_num += 1
                 time.sleep(random.uniform(1, 2))
                 if page_num > 5: break

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurafit | AI Virtual Try-On & Styling</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --rose: #c2185b;
+            --rose-light: #f48fb1;
+            --rose-pale: #fce4ec;
+            --indigo: #3d5afe;
+            --cream: #fff8f5;
+            --surface: #ffffff;
+            --text: #1a1a2e;
+            --muted: #8e8ea0;
+            --border: #f0d6e0;
+            --shadow: 0 8px 32px rgba(194, 24, 91, 0.10);
+            --radius: 18px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--cream);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3 { font-family: 'Playfair Display', serif; }
+
+        .navbar {
+            background: white;
+            padding: 1rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--rose);
+            text-decoration: none;
+            font-family: 'Playfair Display', serif;
+        }
+
+        .nav-links { display: flex; gap: 2rem; }
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .nav-links a:hover { color: var(--rose); }
+
+        .container {
+            max-width: 1200px;
+            margin: 3rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 968px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .step-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+            color: var(--rose);
+        }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--rose-pale);
+            position: relative;
+        }
+
+        .upload-zone:hover { border-color: var(--rose); background: white; }
+        .upload-zone i { font-size: 3rem; color: var(--rose); margin-bottom: 1rem; }
+        .upload-zone p { color: var(--muted); }
+
+        #preview-container {
+            display: none;
+            position: relative;
+            width: 100%;
+            max-height: 400px;
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        #preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .remove-preview {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        /* Form Controls */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: white;
+            font-family: inherit;
+            outline: none;
+        }
+
+        select:focus { border-color: var(--rose); }
+
+        .magic-btn {
+            width: 100%;
+            padding: 1.2rem;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--indigo), var(--rose));
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .magic-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .magic-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        /* Result Panel */
+        .result-panel { position: sticky; top: 100px; }
+
+        .result-empty {
+            text-align: center;
+            padding: 5rem 2rem;
+            color: var(--muted);
+        }
+        .result-empty i { font-size: 4rem; margin-bottom: 1.5rem; color: var(--rose-light); opacity: 0.5; }
+
+        .result-filled { display: none; }
+
+        .main-result-img {
+            width: 100%;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .main-result-img img { width: 100%; border-radius: var(--radius); }
+        .badge-ai {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--rose);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .recommend-title { margin: 2rem 0 1rem; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
+
+        .outfit-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .outfit-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+            display: block;
+        }
+
+        .outfit-card:hover { transform: translateY(-4px); border-color: var(--rose); box-shadow: var(--shadow); }
+        .outfit-card img { width: 100%; height: 140px; object-fit: cover; }
+        .outfit-info { padding: 8px; }
+        .outfit-info .name { font-size: 0.75rem; font-weight: 500; height: 2.4em; overflow: hidden; margin-bottom: 4px; }
+        .outfit-info .price { color: var(--rose); font-weight: 700; font-size: 0.85rem; }
+        .shopee-tag {
+            background: #ff4d2d;
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 4px;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 2000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 60px; height: 60px;
+            border: 5px solid var(--rose-pale);
+            border-top: 5px solid var(--rose);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 2rem;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 12px 24px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            z-index: 3000;
+            transform: translateY(100px);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .toast.show { transform: translateY(0); }
+        .toast.success { background: #4caf50; }
+        .toast.error { background: #f44336; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/" class="logo">Aurafit</a>
+        <div class="nav-links">
+            <a href="/">Trang chủ</a>
+            <a href="tryon.html" style="color: var(--rose); font-weight: 700;">✨ Virtual Try-On</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Input Panel -->
+        <div class="input-panel">
+            <div class="card">
+                <div class="step-title">
+                    <i class="fas fa-camera"></i>
+                    <h3>Bước 1: Tải ảnh của bạn</h3>
+                </div>
+                
+                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Nhấn để chọn ảnh hoặc kéo thả vào đây</p>
+                    <small>JPG, PNG hoặc WEBP (Tối đa 10MB)</small>
+                </div>
+
+                <div id="preview-container">
+                    <img id="preview-img" src="" alt="Preview">
+                    <button class="remove-preview" onclick="removeImage(event)"><i class="fas fa-times"></i></button>
+                </div>
+
+                <input type="file" id="file-input" style="display: none;" accept="image/*" onchange="handleFileSelect(this)">
+            </div>
+
+            <div class="card">
+                <div class="step-title">
+                    <i class="fas fa-magic"></i>
+                    <h3>Bước 2: Chọn Vibes</h3>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Giới tính</label>
+                        <select id="gender">
+                            <option value="female">Nữ</option>
+                            <option value="male">Nam</option>
+                            <option value="unisex">Unisex</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Dịp sử dụng</label>
+                        <select id="occasion">
+                            <option value="casual">Thường ngày</option>
+                            <option value="work">Công sở</option>
+                            <option value="party">Tiệc sự kiện</option>
+                            <option value="date">Hẹn hò</option>
+                            <option value="sport">Thể thao</option>
+                            <option value="beach">Du lịch biển</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Phong cách</label>
+                        <select id="style">
+                            <option value="any">Bất kỳ</option>
+                            <option value="minimalist">Minimalist</option>
+                            <option value="streetwear">Streetwear</option>
+                            <option value="korean">Korean Style</option>
+                            <option value="boho">Boho</option>
+                            <option value="classic">Classic lịch sự</option>
+                            <option value="y2k">Y2K</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Dáng người</label>
+                        <select id="body_shape">
+                            <option value="hourglass">Đồng hồ cát</option>
+                            <option value="inverted_triangle">Tam giác ngược</option>
+                            <option value="pear">Quả lê</option>
+                            <option value="apple">Quả táo</option>
+                            <option value="rectangle">Chữ nhật</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Ngân sách</label>
+                    <select id="budget">
+                        <option value="any">Không giới hạn</option>
+                        <option value="under200">Dưới 200k</option>
+                        <option value="200-500">200k - 500k</option>
+                        <option value="500-1000">500k - 1tr</option>
+                        <option value="above1000">Trên 1tr</option>
+                    </select>
+                </div>
+
+                <button class="magic-btn" id="run-btn" onclick="runTryOn()">
+                    <i class="fas fa-sparkles"></i> MAGIC COORDINATE
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Panel -->
+        <div class="result-panel">
+            <div class="card result-empty" id="result-empty">
+                <i class="fas fa-wand-magic-sparkles"></i>
+                <h2>AI STYLING BOARD</h2>
+                <p>Kết quả thay đồ ảo và gợi ý phối đồ sẽ xuất hiện tại đây sau khi bạn nhấn nút Magic.</p>
+            </div>
+
+            <div class="result-filled" id="result-filled">
+                <div class="main-result-img">
+                    <div class="badge-ai">AI Styled ✨</div>
+                    <img id="result-img" src="" alt="Result">
+                </div>
+
+                <p style="text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    🛍️ Nhấn vào outfit bên dưới để mua trên Shopee
+                </p>
+
+                <h3 class="recommend-title"><i class="fas fa-shopping-bag"></i> Recommended Outfits</h3>
+                <div class="outfit-grid" id="outfit-cards">
+                    <!-- Cards injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <h2>✨ AI đang thay đồ cho bạn...</h2>
+        <p>Quá trình này có thể mất 30-60 giây. Vui lòng không tắt trang.</p>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let selectedFile = null;
+
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast('File quá lớn! Vui lòng chọn ảnh dưới 10MB.', 'error');
+                    return;
+                }
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('upload-zone').style.display = 'none';
+                    document.getElementById('preview-container').style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage(e) {
+            e.stopPropagation();
+            selectedFile = null;
+            document.getElementById('file-input').value = '';
+            document.getElementById('upload-zone').style.display = 'block';
+            document.getElementById('preview-container').style.display = 'none';
+        }
+
+        async function runTryOn() {
+            if (!selectedFile) {
+                showToast('Vui lòng tải ảnh người lên!', 'error');
+                return;
+            }
+
+            const runBtn = document.getElementById('run-btn');
+            const loading = document.getElementById('loading-overlay');
+
+            try {
+                runBtn.disabled = true;
+                loading.style.display = 'flex';
+
+                const formData = new FormData();
+                formData.append('photo', selectedFile);
+                formData.append('gender', document.getElementById('gender').value);
+                formData.append('occasion', document.getElementById('occasion').value);
+                formData.append('style', document.getElementById('style').value);
+                formData.append('body_shape', document.getElementById('body_shape').value);
+                formData.append('budget', document.getElementById('budget').value);
+
+                const response = await fetch(`${API_BASE}/api/virtual-tryon`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showResult(data);
+                    showToast('Thành công! AI đã phối đồ cho bạn.', 'success');
+                } else {
+                    showToast(data.message || 'Có lỗi xảy ra, vui lòng thử lại.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Lỗi kết nối máy chủ hoặc AI đang bận.', 'error');
+            } finally {
+                runBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function showResult(data) {
+            document.getElementById('result-empty').style.display = 'none';
+            document.getElementById('result-filled').style.display = 'block';
+            document.getElementById('result-img').src = data.result_image_url;
+            
+            const container = document.getElementById('outfit-cards');
+            container.innerHTML = '';
+            
+            data.recommended_outfits.forEach(item => {
+                const card = document.createElement('a');
+                card.href = "javascript:void(0)";
+                card.className = 'outfit-card';
+                card.onclick = () => openShopee(item.shopee_url);
+                card.innerHTML = `
+                    <img src="${item.image_url}" alt="${item.name}" onerror="this.src='https://placehold.co/200x260?text=No+Image'">
+                    <div class="outfit-info">
+                        <div class="name">${item.name}</div>
+                        <div class="price">${formatPrice(item.price)}</div>
+                        <div class="shopee-tag">🛍 Shopee</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            // Scroll to result
+            document.getElementById('result-filled').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function openShopee(url) {
+            if (url && url !== '#' && url.startsWith('http')) {
+                window.open(url, '_blank', 'noopener');
+            } else {
+                showToast('Sản phẩm này chưa có link Shopee.', 'error');
+            }
+        }
+
+        function formatPrice(p) {
+            if (!p && p !== 0) return '';
+            return Number(p).toLocaleString('vi-VN') + 'đ';
+        }
+
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = `toast show ${type}`;
+            setTimeout(() => {
+                t.className = 'toast';
+            }, 3500);
+        }
+
+        // Drag & Drop
+        const zone = document.getElementById('upload-zone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+            zone.addEventListener(evt, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        zone.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                const input = document.getElementById('file-input');
+                input.files = files;
+                handleFileSelect(input);
+            }
+        });
+    </script>
+</body>
+</html>

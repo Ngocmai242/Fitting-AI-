@@ -277,9 +277,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Expose Global Functions for HTML OnClick
-    window.logout = function () {
+    window.logout = async function () {
+        // Clear local auth
         localStorage.removeItem('user');
-        window.location.href = 'login.html';
+
+        // Best-effort clear server session (Flask session)
+        try {
+            await fetch(`${API_URL}/logout`, { method: 'POST' });
+        } catch (e) {
+            // ignore network errors on logout
+        }
+
+        const p = (window.location.pathname || '').toLowerCase();
+        const isAdminPage = p.includes('admin_') || p.includes('adminindex') || p.includes('admin');
+        window.location.replace(isAdminPage ? 'admin_login.html' : 'login.html');
     };
 
     window.toggleProfileView = function () {

@@ -3,8 +3,6 @@ import io
 import os
 import time
 import requests
-import shutil
-import uuid
 from datetime import datetime
 
 from flask import (
@@ -30,264 +28,11 @@ from .models import (
     Style,
     User,
 )
-from gradio_client import Client, handle_file
+from .ai.pose import extract_keypoints
+from .ai.features import compute_ratios, estimate_gender
+from .ai.classifier import predict_shape, predict_shape_with_confidence
+from .ai.image_tools import remove_background_rgba, recolor_clothing, upscale_image, change_background, detect_clothing_color
 import json as _json
-
-def call_idm_vton(person_path, garment_path):
-    """
-    Calls IDM-VTON on Hugging Face Space to perform virtual try-on.
-    Returns local path to result image.
-    """
-    spaces = [
-        "freddyaboulton/IDM-VTON",
-        "yisol/IDM-VTON",
-        "adi1516/IDM_VTON"
-    ]
-    
-    last_error = None
-    hf_token = os.getenv("HF_TOKEN", "")
-    
-    for space_id in spaces:
-        try:
-            print(f"[IDM-VTON] Attempting try-on with space: {space_id}")
-            client = Client(space_id, hf_token=hf_token)
-            result = client.predict(
-                dict={"background": handle_file(person_path), "layers": [], "composite": None},
-                garm_img=handle_file(garment_path),
-                garment_des="fashion item",
-                is_checked=True,
-                is_checked_crop=False,
-                denoise_steps=30,
-                seed=42,
-                api_name="/tryon"
-            )
-            # result[0] is the path to the result image
-            return result[0]
-        except Exception as e:
-            last_error = e
-            print(f"[IDM-VTON] Space {space_id} failed: {e}")
-            continue
-    
-    raise Exception(f"All IDM-VTON spaces failed. Last error: {last_error}")
-
-def download_garment_image(image_url):
-    """Downloads garment image to local for IDM-VTON."""
-    try:
-        resp = requests.get(image_url, timeout=15)
-        resp.raise_for_status()
-        
-        # Determine extension
-        ext = '.jpg'
-        content_type = resp.headers.get('Content-Type', '').lower()
-        if 'png' in content_type: ext = '.png'
-        elif 'webp' in content_type: ext = '.webp'
-        
-        upload_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        filename = f"garment_{uuid.uuid4().hex}{ext}"
-        path = os.path.join(upload_dir, filename)
-        
-        with open(path, 'wb') as f:
-            f.write(resp.content)
-        return path
-    except Exception as e:
-        print(f"[IDM-VTON] Failed to download garment: {e}")
-        return None
-
-def _is_allowed_image_file(file_storage) -> bool:
-    try:
-        ct = (file_storage.content_type or "").lower()
-        if ct in ("image/jpeg", "image/jpg", "image/png", "image/webp"):
-            return True
-        fn = (file_storage.filename or "").lower()
-        return fn.endswith((".jpg", ".jpeg", ".png", ".webp"))
-    except Exception:
-        return False
-
-def ai_virtual_tryon(
-    photo_path: str,
-    gender: str,
-    occasion: str,
-    style: str,
-    body_shape: str,
-    result_path: str,
-) -> str:
-    """
-    Placeholder Virtual Try-On. If/when ai_engine exists, integrate here.
-    Current behavior: copies original image to result_path (never crashes the flow).
-    """
-    try:
-        os.makedirs(os.path.dirname(result_path), exist_ok=True)
-        shutil.copyfile(photo_path, result_path)
-        return result_path
-    except Exception:
-        try:
-            shutil.copyfile(photo_path, result_path)
-            return result_path
-        except Exception:
-            return photo_path
-
-def get_recommended_outfits(
-    gender: str,
-    occasion: str,
-    style: str,
-    body_shape: str,
-    budget: str,
-    limit: int = 6,
-) -> list[dict]:
-    """
-    Reads from SQLite database_v2.db using dynamic filters.
-    Falls back to demo data if DB isn't available or query fails.
-    """
-    budget_map = {
-        "under200": (0, 200_000),
-        "200-500": (200_000, 500_000),
-        "500-1000": (500_000, 1_000_000),
-        "above1000": (1_000_000, 999_999_999),
-    }
-
-    try:
-        import sqlite3
-
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        db_path = os.path.abspath(os.path.join(base_dir, "..", "..", "database", "database_v2.db"))
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-
-        cur.execute("PRAGMA table_info(products)")
-        cols = {r[1] for r in cur.fetchall()}
-
-        url_expr = "shopee_url" if "shopee_url" in cols else "product_url"
-        img_expr = "image_url" if "image_url" in cols else "image"
-
-        where = []
-        params: list = []
-
-        # gender: exact match OR unisex
-        if "gender" in cols and gender:
-            where.append("(gender = ? OR gender = 'unisex' OR gender = 'Unisex')")
-            params.append(gender)
-
-        # occasion: exact match if column exists
-        if "occasion" in cols and occasion:
-            where.append("occasion = ?")
-            params.append(occasion)
-
-        # style_tag: optional if not 'any'
-        if style and style != "any" and "style_tag" in cols:
-            where.append("style_tag = ?")
-            params.append(style)
-
-        # body_shape_tag: optional if column exists and provided
-        if body_shape and "body_shape_tag" in cols:
-            where.append("body_shape_tag = ?")
-            params.append(body_shape)
-
-        # budget
-        if budget and budget != "any" and "price" in cols and budget in budget_map:
-            lo, hi = budget_map[budget]
-            where.append("CAST(price AS INTEGER) BETWEEN ? AND ?")
-            params.extend([lo, hi])
-
-        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
-        sql = f"""
-            SELECT
-                id,
-                name,
-                CAST(price AS INTEGER) AS price,
-                {img_expr} AS image_url,
-                {url_expr} AS shopee_url
-            FROM products
-            {where_sql}
-            ORDER BY RANDOM()
-            LIMIT ?
-        """
-        params.append(int(limit))
-
-        rows = cur.execute(sql, params).fetchall()
-        conn.close()
-
-        items: list[dict] = []
-        for r in rows:
-            items.append(
-                {
-                    "id": r["id"],
-                    "name": r["name"] or "",
-                    "price": int(r["price"] or 0),
-                    "image_url": r["image_url"],
-                    "shopee_url": r["shopee_url"],
-                }
-            )
-        if items:
-            return items
-    except Exception:
-        pass
-
-def get_recommended_outfits(gender, occasion, style, body_shape, budget, limit=6):
-    """
-    Fetch products from database based on filters.
-    """
-    try:
-        query = Product.query
-        
-        # Gender filter
-        if gender and gender.lower() != 'unisex':
-             # Match specific gender or unisex items
-             query = query.filter((Product.gender == gender) | (Product.gender == 'unisex'))
-        
-        # Occasion filter
-        if occasion and occasion.lower() != 'any':
-             query = query.filter(Product.occasion == occasion)
-             
-        # Style filter
-        if style and style.lower() != 'any':
-             query = query.filter((Product.style_tag == style) | (Product.style_label == style))
-             
-        # Budget filter
-        if budget and budget.lower() != 'any':
-             if budget == 'under200':
-                  query = query.filter(Product.price < 200000)
-             elif budget == '200-500':
-                  query = query.filter(Product.price >= 200000, Product.price <= 500000)
-             elif budget == '500-1000':
-                  query = query.filter(Product.price >= 500000, Product.price <= 1000000)
-             elif budget == 'above1000':
-                  query = query.filter(Product.price > 1000000)
-        
-        # Order by random and limit
-        from sqlalchemy import func
-        products = query.order_by(func.random()).limit(limit).all()
-        
-        if not products:
-             # Fallback: get any products if filter is too strict
-             products = Product.query.order_by(func.random()).limit(limit).all()
-
-        results = []
-        for p in products:
-            results.append({
-                'id': p.id,
-                'name': p.name,
-                'price': p.price,
-                'image_url': p.image_url,
-                'shopee_url': getattr(p, "shopee_url", None) or p.product_url or f"https://shopee.vn/search?keyword={p.name}"
-            })
-        return results
-    except Exception as e:
-        print(f"[DB] Recommend error: {e}")
-        return []
-
-def extract_keypoints(*args, **kwargs): return [], None
-def compute_ratios(*args, **kwargs): return {}
-def estimate_gender(*args, **kwargs): return "Unisex"
-def predict_shape(*args, **kwargs): return "Rectangle"
-def predict_shape_with_confidence(*args, **kwargs): return "Rectangle", 0.5
-def remove_background_rgba(*args, **kwargs): return None
-def recolor_clothing(*args, **kwargs): return None
-def upscale_image(*args, **kwargs): return None
-def change_background(*args, **kwargs): return None
-def detect_clothing_color(*args, **kwargs): return "Multicolor", "Pattern"
 
 def is_single_item_image(image_bytes: bytes) -> bool:
     """
@@ -312,25 +57,15 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 # Import crawlers independently
 try:
-    from data_engine.shopee_crawler import crawl_shopee_new, save_products_to_db
+    from data_engine.shopee_crawler import crawl_shop as crawl_shopee_new, save_products_to_db
     from data_engine.product_classifier import batch_classify, save_classifications, build_shop_profile, map_all_shops
-    from data_engine.image_cleaner import batch_clean_from_db
-    from data_engine.product_tagger import tag_all_products
 except ImportError as e:
-    print(f"Could not import new crawlers/classifiers: {e}")
-    # Fallbacks to prevent NameError
-    def crawl_shopee_new(*args, **kwargs):
-        return {"success": False, "error": f"Crawler not available: {e}", "products": []}
-    def save_products_to_db(*args, **kwargs): return 0
-    def batch_classify(*args, **kwargs): return []
-    def save_classifications(*args, **kwargs): return 0
-    def build_shop_profile(*args, **kwargs): return {}
-    def map_all_shops(*args, **kwargs): return {}
+    print(f"Could not import new crawlers/classifiers: {str(e).encode('ascii', 'ignore').decode('ascii')}")
 
 try:
     from data_engine.crawler.shopee import crawl_shop_url as crawl_shopee
 except ImportError as e:
-    print(f"Could not import shopee crawler: {e}")
+    print(f"Could not import shopee crawler: {str(e).encode('ascii', 'ignore').decode('ascii')}")
     def crawl_shopee(url, limit=50): return []
 
 try:
@@ -343,16 +78,6 @@ CRAWLER_AVAILABLE = True # Always True now since we use requests
 
 
 main_bp = Blueprint('main', __name__)
-
-# --- Auth utility ---
-@main_bp.route('/api/logout', methods=['POST'])
-def logout_api():
-    """Clear server-side session."""
-    try:
-        session.clear()
-    except Exception:
-        pass
-    return jsonify({'success': True}), 200
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Canonical clothing taxonomy (for AI training)
@@ -683,125 +408,27 @@ def _select_variant_image(item: dict) -> str:
         except Exception:
             continue
     return _full(raw_img)
-def _finalize_gender(initial, item_type_name, category_name, product_name):
+def _finalize_gender(initial: str, item_type_name: str | None, category_name: str | None, product_name: str | None) -> str:
     g = (initial or "Unisex").strip()
+    it = (item_type_name or "").strip().lower()
     cat = _norm_ascii(category_name or "")
     name_norm = _norm_ascii(product_name or "")
-    name_padded = " " + name_norm + " "
-
-    # --- Unisex keywords (explicit) ---
-    unisex_phrases = [
-        "nam nu",
-        "nu nam",
-        "unisex",
-        "nam va nu",
-        "couple",
-        "ca nam ca nu",
+    female_cats = {"crop_top", "dress", "skirt", "blouse", "camisole", "tube_top", "off_shoulder", "bralette", "babydoll", "peplum"}
+    female_substrings = [
+        "crop", "dress", "skirt", "blouse", "camisole", "tube", "off shoulder",
+        "tre vai", "tay bong", "yem", "hai day", "2 day", "bodycon",
+        "babydoll", "peplum", "co tim", "ren", "phoi ren", "kem no", "no", "beo", "beo gau", "xinh xan", "de thuong", "long vu", "nu tinh", "danh nu"
     ]
-    if any(p in name_norm for p in unisex_phrases):
-        return "Unisex"
-
-    # --- Male tokens: ưu tiên và match theo từ độc lập ---
-    male_explicit = ["nam", "men", "male", "boy", "gentleman", "quan nam", "ao nam", "cho nam"]
-    is_male = any(
-        (" " + tok + " ") in name_padded
-        or name_padded.startswith(tok + " ")
-        or name_padded.endswith(" " + tok)
-        for tok in male_explicit
-    )
-
-    # --- Female categories ---
-    female_cats = {
-        "crop_top",
-        "dress",
-        "skirt",
-        "blouse",
-        "camisole",
-        "tube_top",
-        "off_shoulder",
-        "bralette",
-        "babydoll",
-        "peplum",
-        "vay nu",
-        "dam nu",
-        "chan vay",
-    }
-
-    # --- Female substrings trong category (đã loại bỏ token quá ngắn gây false positive) ---
-    female_cat_substrings = [
-        "crop",
-        "dress",
-        "skirt",
-        "blouse",
-        "camisole",
-        "tube",
-        "off shoulder",
-        "tre vai",
-        "yem",
-        "hai day",
-        "bodycon",
-        "babydoll",
-        "peplum",
+    female_tokens = [
+        "nu", "nư", "women", "girl", "lady", "dam", "vay", "croptop", "crop top", "hai day", "2 day", "yem",
+        "skirt", "dress", "jumpsuit", "blouse", "camisole", "tube top", "off shoulder", "bralette", "babydoll", "peplum",
+        "co tim", "ren", "phoi ren", "kem no", "no", "beo", "beo gau", "xinh xan", "de thuong", "long vu", "nu tinh", "danh nu"
     ]
-
-    # --- Female tokens trong tên (đã loại bỏ 'no' và các token dễ match nhầm) ---
-    female_name_tokens = [
-        "nu ",
-        " nu",
-        "women",
-        "girl",
-        "lady",
-        "dam ",
-        " dam",
-        "vay ",
-        " vay",
-        "croptop",
-        "crop top",
-        "hai day",
-        "2 day",
-        "yem ",
-        " yem",
-        "skirt",
-        "dress",
-        "jumpsuit",
-        "blouse",
-        "camisole",
-        "tube top",
-        "off shoulder",
-        "bralette",
-        "babydoll",
-        "peplum",
-        "xinh xan",
-        "de thuong nu",
-        "nu tinh",
-        "danh nu",
-        "thoi trang nu",
-        "chan vay",
-    ]
-
-    is_female_cat = cat.replace(" ", "_") in female_cats or any(sub in cat for sub in female_cat_substrings)
-    is_female_name = any(tok in name_padded for tok in female_name_tokens)
-
-    # --- Detecting Male signals in Category ---
-    male_cat_substrings = ["nam", "men", "male", "boy"]
-    is_male_cat = any(sub in cat for sub in male_cat_substrings)
-
-    # --- Final Logic ---
-    # 1. Nếu có signal nam rõ rệt trong category hoặc tên, và KHÔNG có category đặc thù nữ (váy, đầm...)
-    if (is_male or is_male_cat) and not is_female_cat:
-        return "Male"
-    
-    # 2. Nếu có signal nữ rõ rệt
-    if is_female_cat or is_female_name:
-        # Kiểm tra lại xem có phải unisex không (có cả nam và nữ)
-        if is_male or is_male_cat:
-            return "Unisex"
+    male_tokens = ["nam", "men", "male", "boy", "gentleman"]
+    if (cat.replace(" ", "_") in female_cats) or any(sub in cat for sub in female_substrings) or any(tok in name_norm for tok in female_tokens):
         return "Female"
-
-    # 3. Mặc định theo initial hoặc Unisex
-    if g.lower() == "unisex" or (not is_male and not is_female_name):
-        return "Unisex"
-        
+    if g.lower() == "unisex" and any(tok in name_norm for tok in male_tokens):
+        return "Male"
     return g
 
 _COLOR_MAP = {
@@ -1342,9 +969,9 @@ def remove_bg():
 def register():
     data = request.json
     print(f"\n=== REGISTRATION ATTEMPT ===")
-    print(f"Username: {data.get('username')}")
-    print(f"Email: {data.get('email')}")
-    print(f"Phone: {data.get('phone')}")
+    print(f"Username: {str(data.get('username')).encode('ascii', 'ignore').decode('ascii')}")
+    print(f"Email: {str(data.get('email')).encode('ascii', 'ignore').decode('ascii')}")
+    print(f"Phone: {str(data.get('phone')).encode('ascii', 'ignore').decode('ascii')}")
     
     # Clean input
     username = data.get('username', '').strip()
@@ -1355,7 +982,7 @@ def register():
     # Check if user already exists
     existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
     if existing_user:
-        print(f"ERROR: User already exists - {existing_user.username}")
+        print(f"ERROR: User already exists - {str(existing_user.username).encode('ascii', 'ignore').decode('ascii')}")
         return jsonify({'message': 'User already exists'}), 400
     
     try:
@@ -1386,7 +1013,7 @@ def register():
         db.session.add(new_user)
         db.session.commit()
         
-        print(f"[AUTH] USER CREATED SUCCESSFULLY:")
+        print(f"✅ USER CREATED SUCCESSFULLY:")
         print(f"   - ID: {new_user.id}")
         print(f"   - Username: {new_user.username}")
         print(f"   - Role: {new_user.role}")
@@ -1397,7 +1024,7 @@ def register():
         
     except Exception as e:
         db.session.rollback()
-        print(f"[AUTH] REGISTRATION ERROR: {str(e)}")
+        print(f"❌ REGISTRATION ERROR: {str(e)}")
         return jsonify({'message': f'Registration failed: {str(e)}'}), 500
 
 
@@ -1699,18 +1326,7 @@ def crawl():
             crawled_products = crawl_lazada(shop_url, limit=50)
         else:
             current_app.logger.info("Detect Shopee URL (or default)")
-            # Sử dụng Playwright crawler v6 mới
-            limit = data.get('limit', 40)
-            result = crawl_shopee_new(shop_url, target_count=limit)
-            
-            if not result.get("success"):
-                return jsonify({
-                    'message': f'Lỗi Shopee: {result.get("error")}',
-                    'products': [],
-                    'count': 0
-                }), 200
-            
-            crawled_products = result.get("products", [])
+            crawled_products = crawl_shopee(shop_url, limit=50)
         
         if not crawled_products:
             return jsonify({
@@ -1743,9 +1359,8 @@ def crawl():
             'message': f'Lỗi khi crawl: {str(e)}'
         }), 500
 
-@main_bp.route('/api/admin/crawl/save-preview', methods=['POST'])
-def save_crawled_products_preview():
-    """Lưu sản phẩm Shopee/Lazada (flow cũ) vào ORM Product + taxonomy."""
+@main_bp.route('/api/crawl/save', methods=['POST'])
+def save_crawled_products():
     data = request.json
     products_to_save = data.get('products', [])
     default_shop_name = (data.get('shop_name') or '').strip()
@@ -1759,31 +1374,33 @@ def save_crawled_products_preview():
     
     try:
         for item in products_to_save:
-            # BUG 3 Fix: Sử dụng đúng mapping item_id (composite string) từ crawler
-            item_id_str = item.get('id') or item.get('variant_id') or item.get('itemid') or item.get('item_id')
+            item_id_value = item.get('variant_id') or item.get('itemid') or item.get('item_id') or item.get('itemId')
+            # Ưu tiên product_url, sau đó shopee_link, cuối cùng là url (từ crawler Shopee)
             link_value = item.get('product_url') or item.get('shopee_link') or item.get('url')
 
-            if not item_id_str and not link_value:
+            if not item_id_value and not link_value:
                 continue
 
-            # Query theo item_id (string unique) thay vì id (integer PK)
-            product = Product.query.filter_by(item_id=str(item_id_str)).first()
-            
+            item_id = str(item_id_value) if item_id_value else None
+
+            product = None
+            if item_id:
+                product = Product.query.filter_by(item_id=item_id).first()
             if not product and link_value:
                 product = Product.query.filter_by(product_url=link_value[:2000]).first()
 
             created = False
             if not product:
-                if not item_id_str:
+                if not item_id:
                     continue
-                product = Product(item_id=str(item_id_str))
+                product = Product(item_id=item_id)
                 db.session.add(product)
                 created = True
-            
-            # Gán Shopee item_id số (nếu có) vào biến shopee_id_num (chỉ dùng để lưu metadata)
-            # Tuy nhiên trong DB hiện tại item_id là string, nên ta giữ nguyên item_id_str
-            # Nếu models.py có thêm trường item_id_numeric thì mới cần parse int.
-            # Ở đây ta cập nhật các field khác.
+            try:
+                if item_id:
+                    product.item_id = int(item_id)
+            except:
+                pass
 
             product.name = (item.get('name') or '')[:200]
             selected_img = _select_variant_image(item)
@@ -1936,7 +1553,7 @@ def save_crawled_products_preview():
 
     except Exception as e:
         db.session.rollback()
-        print(f"Save Crawl Error: {e}")
+        print(f"Save Crawl Error: {str(e).encode('ascii', 'ignore').decode('ascii')}")
         return jsonify({'message': f'Database error: {str(e)}'}), 500
 
 @main_bp.route('/api/products', methods=['GET', 'POST'])
@@ -1953,21 +1570,14 @@ def products():
                 'item_id': p.item_id,
                 'name': p.name,
                 'image': p.image_url,
-                'clean_image_path': p.clean_image_path,
                 'price': p.price,
                 'category': p.item_type.name if p.item_type else p.category_label,
                 'sub_category': p.category.name if p.category else p.sub_category_label,
                 'product_url': p.product_url,
-                'shopee_url': getattr(p, "shopee_url", None) or p.product_url,
-                'style_tag': getattr(p, "style_tag", None),
-                'body_shape_tag': getattr(p, "body_shape_tag", None),
-                'color': p.color.name if p.color else (p.color_primary or p.color_label),
-                'color_primary': p.color_primary,
-                'color_secondary': p.color_secondary,
-                'hex_primary': p.hex_primary,
+                'color': p.color.name if p.color else p.color_label,
                 'color_tone': p.color.tone if p.color else p.color_tone,
-                'season': p.season_ref.name if p.season_ref else (p.season or p.season_label or 'All-season'),
-                'occasion': p.occasion_ref.name if p.occasion_ref else (p.occasion or p.occasion_label or 'Daily wear'),
+                'season': p.season_ref.name if p.season_ref else p.season_label,
+                'occasion': p.occasion_ref.name if p.occasion_ref else p.occasion_label,
                 'gender': gender_disp,
                 'material': p.material,
                 'style': p.style_ref.name if p.style_ref else p.style_label,
@@ -1997,36 +1607,18 @@ def products():
         raw_img = (data.get('image') or '').strip()
         saved_path = _download_image_to_uploads(raw_img) if raw_img else None
         product.image_url = (saved_path or raw_img)[:500]
-        incoming_url = (data.get('shopee_url') or data.get('product_url') or data.get('shopee_link') or '').strip()
-        product.product_url = incoming_url[:2000]
-        try:
-            product.shopee_url = incoming_url[:2000]
-        except Exception:
-            pass
+        product.product_url = (data.get('product_url') or data.get('shopee_link') or '')[:2000]
         product.price = _parse_vnd_price(data.get('price', 0))
         product.shop_name = (data.get('shop_name') or 'Manual Entry')[:150]
         # For manual entry, we default to valid=True as the user is inputting it
         product.is_valid = True
 
         _norm = normalize_product_fields(data)
-        # Allow admin to explicitly set gender/occasion/style_tag/body_shape_tag for Try-On filters
-        product.gender = (data.get("gender") or _norm["gender"] or "")[:20]
+        product.gender = _norm["gender"][:20]
         product.material = _norm["material"][:100]
         product.fit_type = _norm["fit_type"][:50]
         product.color_tone = _norm["color_tone"][:20]
         product.details = _norm["details"]
-        try:
-            product.occasion = (data.get("occasion") or _norm.get("occasion_name") or product.occasion or "")[:50]
-        except Exception:
-            pass
-        try:
-            product.style_tag = (data.get("style_tag") or "")[:100] if data.get("style_tag") else (product.style_tag or None)
-        except Exception:
-            pass
-        try:
-            product.body_shape_tag = (data.get("body_shape_tag") or "")[:100] if data.get("body_shape_tag") else (product.body_shape_tag or None)
-        except Exception:
-            pass
 
         category_field = data.get('category') or 'Other'
         if isinstance(category_field, str) and '|' in category_field:
@@ -2202,66 +1794,48 @@ def api_upscale():
 @main_bp.route('/api/shops', methods=['GET'])
 def list_shops():
     """
-    Combined shop history from both the Product database and the dedicated shops registry table.
+    Aggregate distinct shops from Product table and derive shop URLs when possible.
+    For Shopee product_url like /product/<shopid>/<itemid> → https://shopee.vn/shop/<shopid>
+    For Lazada, fallback to homepage.
     """
     try:
-        import sqlite3
         import re
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
-        
+        # Use all products (or last 500) to discover shops quickly
+        products = Product.query.order_by(Product.id.desc()).limit(500).all()
         shops = {}
-        
-        # 1. First, get shops from the dedicated 'shops' table (History)
-        try:
-            if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path)
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shops'")
-                if cursor.fetchone():
-                    rows = cursor.execute("SELECT shop_id, display_name, shop_url, last_crawled FROM shops ORDER BY last_crawled DESC").fetchall()
-                    for row in rows:
-                        name = (row['display_name'] or '').strip()
-                        if name:
-                            shops[name] = {
-                                'shop_name': name,
-                                'shop_url': row['shop_url'],
-                                'shop_id': row['shop_id'],
-                                'count': 0,
-                                'last_crawled': row['last_crawled']
-                            }
-                conn.close()
-        except Exception as e:
-            current_app.logger.warning(f"Error reading shops table: {e}")
-
-        # 2. Extract from Product table (Actual stored items)
-        products = Product.query.with_entities(Product.shop_name, Product.product_url, Product.id).order_by(Product.id.desc()).limit(1000).all()
-        for name_raw, url, p_id in products:
-            name = (name_raw or '').strip() or 'Unknown Shop'
+        for p in products:
+            name = (p.shop_name or '').strip() or 'Unknown Shop'
+            url = p.product_url or ''
+            shop_url = None
+            if 'shopee.vn' in url:
+                m = re.search(r'/product/(\d+)/\d+', url)
+                if m:
+                    shop_id = m.group(1)
+                    shop_url = f"https://shopee.vn/shop/{shop_id}"
+            elif 'lazada.vn' in url:
+                shop_url = "https://www.lazada.vn/"
             if name not in shops:
-                shop_url = None
-                if url and 'shopee.vn' in url:
-                    m = re.search(r'/product/(\d+)/\d+', url)
-                    if m: shop_url = f"https://shopee.vn/shop/{m.group(1)}"
-                shops[name] = {'shop_name': name, 'shop_url': shop_url, 'count': 0, 'last_crawled': f"product_{p_id}"}
+                shops[name] = {'shop_name': name, 'shop_url': shop_url, 'count': 0}
+            # Prefer a discovered URL
+            if not shops[name]['shop_url'] and shop_url:
+                shops[name]['shop_url'] = shop_url
             shops[name]['count'] += 1
-            
-        # 3. Fallback to shops.json
+        # Overlay registry (saved by admin when crawl/save)
         try:
-            registry_path = os.path.abspath(os.path.join(base_dir, '..', 'data', 'shops.json'))
+            registry_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'shops.json'))
             if os.path.exists(registry_path):
                 with open(registry_path, 'r', encoding='utf-8') as f:
                     saved_map = _json.load(f)
                     for n, v in saved_map.items():
                         if n not in shops:
                             shops[n] = {'shop_name': n, 'shop_url': v.get('shop_url'), 'count': 0}
-                        elif v.get('shop_url') and not shops[n]['shop_url']:
-                            shops[n]['shop_url'] = v.get('shop_url')
-        except Exception: pass
+                        else:
+                            if v.get('shop_url'):
+                                shops[n]['shop_url'] = v.get('shop_url')
+        except Exception as _e:
+            current_app.logger.warning(f"Shop registry read failed: {_e}")
 
-        # Sort by last_crawled desc - ensure string comparison
-        items = sorted(shops.values(), key=lambda x: str(x.get('last_crawled') or ''), reverse=True)
+        items = sorted(shops.values(), key=lambda x: x['shop_name'].lower())
         return jsonify(items), 200
     except Exception as e:
         return jsonify({'message': f'list_shops error: {str(e)}'}), 500
@@ -2278,33 +1852,6 @@ def rename_shop():
             return jsonify({'message': 'No change'}), 200
         updated = Product.query.filter(Product.shop_name == old).update({'shop_name': new}, synchronize_session=False)
         db.session.commit()
-
-        # Also update historical shops table if it exists
-        try:
-            import sqlite3
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
-            if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path)
-                conn.execute("UPDATE shops SET display_name = ? WHERE display_name = ?", (new, old))
-                conn.commit()
-                conn.close()
-        except Exception as e:
-            current_app.logger.warning(f"History table update failed on rename: {e}")
-
-        # Also update shops.json if it exists
-        try:
-            registry_path = os.path.abspath(os.path.join(base_dir, '..', 'data', 'shops.json'))
-            if os.path.exists(registry_path):
-                with open(registry_path, 'r', encoding='utf-8') as f:
-                    s_map = _json.load(f)
-                if old in s_map:
-                    val = s_map.pop(old)
-                    val['shop_name'] = new
-                    s_map[new] = val
-                    with open(registry_path, 'w', encoding='utf-8') as f:
-                        _json.dump(s_map, f, ensure_ascii=False, indent=2)
-        except Exception: pass
         return jsonify({'message': 'ok', 'updated': updated}), 200
     except Exception as e:
         db.session.rollback()
@@ -2325,23 +1872,16 @@ def product_detail(id):
             'item_id': product.item_id,
             'name': product.name,
             'image': product.image_url,
-            'clean_image_path': product.clean_image_path,
             'price': product.price,
             'category': product.item_type.name if product.item_type else product.category_label,
             'sub_category': product.category.name if product.category else product.sub_category_label,
             'style': product.style_ref.name if product.style_ref else product.style_label,
             'shop_name': product.shop_name,
             'product_url': product.product_url,
-            'shopee_url': getattr(product, "shopee_url", None) or product.product_url,
-            'style_tag': getattr(product, "style_tag", None),
-            'body_shape_tag': getattr(product, "body_shape_tag", None),
-            'color': product.color.name if product.color else (product.color_primary or product.color_label),
-            'color_primary': product.color_primary,
-            'color_secondary': product.color_secondary,
-            'hex_primary': product.hex_primary,
+            'color': product.color.name if product.color else product.color_label,
             'color_tone': product.color.tone if product.color else product.color_tone,
-            'season': product.season_ref.name if product.season_ref else (product.season or product.season_label or 'All-season'),
-            'occasion': product.occasion_ref.name if product.occasion_ref else (product.occasion or product.occasion_label or 'Daily wear'),
+            'season': product.season_ref.name if product.season_ref else product.season_label,
+            'occasion': product.occasion_ref.name if product.occasion_ref else product.occasion_label,
             'gender': gender_disp,
             'material': product.material,
             'fit_type': product.fit_type,
@@ -2366,42 +1906,12 @@ def product_detail(id):
             product.image_url = data['image']
         if 'product_url' in data:
             product.product_url = data['product_url']
-            try:
-                product.shopee_url = data['product_url']
-            except Exception:
-                pass
-        if 'shopee_url' in data:
-            try:
-                product.shopee_url = data['shopee_url']
-            except Exception:
-                pass
-            if not (data.get('product_url') or '').strip():
-                product.product_url = data['shopee_url']
         elif 'shopee_link' in data:
             product.product_url = data['shopee_link']
-            try:
-                product.shopee_url = data['shopee_link']
-            except Exception:
-                pass
         if 'shop_name' in data:
             product.shop_name = data['shop_name']
         if 'gender' in data:
             product.gender = data['gender']
-        if 'occasion' in data:
-            try:
-                product.occasion = data['occasion']
-            except Exception:
-                pass
-        if 'style_tag' in data:
-            try:
-                product.style_tag = data['style_tag']
-            except Exception:
-                pass
-        if 'body_shape_tag' in data:
-            try:
-                product.body_shape_tag = data['body_shape_tag']
-            except Exception:
-                pass
         if 'material' in data:
             product.material = data['material']
         if 'fit_type' in data:
@@ -2524,84 +2034,6 @@ def export_dataset():
 def tryon():
     return jsonify({'status': 'success'}), 200
 
-
-@main_bp.route('/api/virtual-tryon', methods=['POST'])
-def virtual_tryon_api():
-    try:
-        if 'photo' not in request.files:
-            return jsonify({'success': False, 'message': 'photo is required'}), 400
-
-        photo = request.files['photo']
-        if not photo or not photo.filename:
-            return jsonify({'success': False, 'message': 'photo is required'}), 400
-
-        if not _is_allowed_image_file(photo):
-            return jsonify({'success': False, 'message': 'Only JPG/PNG/WEBP are supported'}), 400
-
-        gender = (request.form.get('gender') or 'female').strip()
-        occasion = (request.form.get('occasion') or 'casual').strip()
-        style = (request.form.get('style') or 'any').strip()
-        body_shape = (request.form.get('body_shape') or '').strip()
-        budget = (request.form.get('budget') or 'any').strip()
-
-        # Folders
-        upload_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
-        results_dir = os.path.join(current_app.static_folder, 'static', 'tryon_results')
-        os.makedirs(upload_dir, exist_ok=True)
-        os.makedirs(results_dir, exist_ok=True)
-
-        # Save Person Image
-        ext = os.path.splitext(photo.filename)[1].lower() or '.jpg'
-        in_name = f"{uuid.uuid4().hex}{ext}"
-        in_path = os.path.join(upload_dir, in_name)
-        photo.save(in_path)
-
-        # 1. Get filtered outfits
-        recommended = get_recommended_outfits(
-            gender=gender,
-            occasion=occasion,
-            style=style,
-            body_shape=body_shape,
-            budget=budget,
-            limit=6,
-        )
-
-        if not recommended:
-             return jsonify({'success': False, 'message': 'No suitable items found in database for this selection.'}), 404
-
-        # 2. Get the best match (first item) garment image
-        best_match = recommended[0]
-        garment_url = best_match.get('image_url')
-        
-        if not garment_url:
-             return jsonify({'success': False, 'message': 'Best match item is missing an image.'}), 400
-             
-        garment_path = download_garment_image(garment_url)
-        if not garment_path:
-             return jsonify({'success': False, 'message': 'Failed to download clothing image from Shopee.'}), 500
-
-        # 3. Call AI Try-On
-        out_name = f"result_{uuid.uuid4().hex}.jpg"
-        out_path = os.path.join(results_dir, out_name)
-
-        try:
-            temp_result_path = call_idm_vton(in_path, garment_path)
-            # Copy result to stable folder
-            shutil.copyfile(temp_result_path, out_path)
-        except Exception as ai_err:
-            print(f"[IDM-VTON] AI Try-On failed: {ai_err}")
-            return jsonify({'success': False, 'message': f'AI Service is busy or failed: {str(ai_err)}'}), 503
-
-        return jsonify({
-            "success": True,
-            "result_image_url": f"/static/tryon_results/{out_name}",
-            "recommended_outfits": recommended
-        }), 200
-
-    except Exception as e:
-        print(f"[API] Error: {e}")
-        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
-
 # --- Smart AI Coordination Routes ---
 
 @main_bp.route('/api/ai/train', methods=['POST'])
@@ -2696,153 +2128,28 @@ def ai_outfit_for_person():
 @main_bp.route('/api/admin/crawl-shop', methods=['POST'])
 def crawl_shopee_shop():
     data = request.get_json()
-    shop_url     = (data.get("shop_url") or "").strip()
-    shop_name    = data.get("shop_name", "")
-    target_count = int(data.get("target_count", 40))
-    save_to_db   = data.get("save_to_db", True) # Default remains True for backward compatibility
+    shop_url = data.get('shop_url', '').strip()
+    target_count = data.get('target_count', 40)
+    skip_db = data.get('skip_db', False)
 
     if not shop_url:
-        return jsonify({"success": False, "error": "Missing shop_url", "products": []}), 400
+        return jsonify({'success': False, 'error': 'Thieu shop_url'}), 400
 
     try:
-        # Use the newly downloaded stealth crawlers
-        logger = current_app.logger
-        products = []
-        
-        if 'shopee.vn' in shop_url:
-            logger.info(f"Using Shopee stealth crawler for {shop_url}")
-            products = crawl_shopee(shop_url, limit=target_count)
-        elif 'lazada.vn' in shop_url:
-            logger.info(f"Using Lazada stealth crawler for {shop_url}")
-            products = crawl_lazada(shop_url, limit=target_count)
-        
-        if not products:
-            if 'shopee.vn' in shop_url:
-                # Fallback to old playwright crawler for Shopee if stealth crawler fails
-                logger.info("Stealth crawler returned no results, falling back to Playwright crawler...")
-                result = crawl_shopee_new(shop_url, target_count=target_count)
-            else:
-                result = {"success": False, "error": "No products found", "products": []}
-        else:
-            # Normalize for DB compatibility
-            normalized_products = []
-            for p in products:
-                item_id = str(p.get("itemid", ""))
-                shop_id = str(p.get("shopid", ""))
-                # Use format consistent with old crawler: {shop_id}_{item_id}
-                p["id"] = f"{shop_id}_{item_id}" if shop_id and item_id else item_id
-                # Ensure image_url key exists
-                p["image_url"] = p.get("image", "")
-                # Ensure price_display exists
-                p["price_display"] = f"{int(p.get('price', 0)):,}đ".replace(",", ".")
-                # Ensure shop_name exists
-                p["shop_name"] = shop_name or p.get("shop_name")
-                normalized_products.append(p)
-
-            # Prepare result in the format the route expects
-            result = {
-                "success": True,
-                "products": normalized_products,
-                "shop_id": products[0].get("shopid") if products else None,
-                "total_crawled": len(products)
-            }
-
-        if not result["success"]:
-            return jsonify({
-                "success": False,
-                "error": result.get("error") or "No products found",
-                "products": [],
-                "log": [
-                    f"> [1/2] Connecting to: {shop_url[:80]}...",
-                    f"> [2/2] FAILED: {result.get('error') or 'Empty result'}",
-                ]
-            })
-
-        saved = 0
-        if save_to_db:
-            # Sync shop_name into product objects
-            if shop_name:
-                for p in result.get("products", []):
-                    if not p.get("shop_name"):
-                        p["shop_name"] = shop_name
-            saved = save_products_to_db(result["products"])
-            
-            # Post-crawl processing: Clean Images + AI Tagging
-            try:
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-                db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
-                
-                # Step 1: Clean images (tách ảnh ghép)
-                try:
-                    batch_clean_from_db(db_path, limit=saved)
-                except Exception as ce:
-                    print(f"[Cleaner] Image cleaning failed: {ce}")
-                
-                # Step 2: AI tagging (gán màu, nhãn) - Gọi theo hướng dẫn BƯỚC 3
-                try:
-                    tag_all_products(db_path=db_path, limit=saved)
-                except Exception as te:
-                    print(f"[Tagger] Product tagging failed: {te}")
-
-            except Exception as pe:
-                print(f"Post-crawl processing failed: {pe}")
-
-        # ALWAYS save or update shop history info when a crawl is performed
-        if result.get("shop_id") and (shop_name or shop_url):
-            try:
-                import sqlite3
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-                db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
-                
-                conn = sqlite3.connect(db_path)
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS shops 
-                    (shop_id TEXT PRIMARY KEY, display_name TEXT, shop_url TEXT,
-                        last_crawled TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-                """)
-                d_name = shop_name or f"Shopee Shop {result['shop_id']}"
-                conn.execute("""
-                    INSERT OR REPLACE INTO shops (shop_id, display_name, shop_url, last_crawled)
-                    VALUES (?,?,?, CURRENT_TIMESTAMP)
-                """, (result["shop_id"], d_name, shop_url))
-                conn.commit()
-                conn.close()
-                
-                # Sync with legacy shops.json for complete coverage
-                registry_path = os.path.abspath(os.path.join(base_dir, '..', 'data', 'shops.json'))
-                os.makedirs(os.path.dirname(registry_path), exist_ok=True)
-                s_map = {}
-                if os.path.exists(registry_path):
-                    try:
-                        with open(registry_path, 'r', encoding='utf-8') as f: s_map = _json.load(f)
-                    except: s_map = {}
-                s_map[d_name] = {'shop_name': d_name, 'shop_url': shop_url}
-                with open(registry_path, 'w', encoding='utf-8') as f:
-                    _json.dump(s_map, f, ensure_ascii=False, indent=2)
-
-            except Exception as e:
-                current_app.logger.warning(f"Failed to update shop history: {e}")
-
-        return jsonify({
-            "success": True,
-            "shop_id": result["shop_id"],
-            "total_crawled": result["total_crawled"],
-            "saved_to_db": saved,
-            "products": result["products"],
-            "log": [
-                f"> [1/2] Connecting to: {shop_url[:80]}...",
-                f"> [2/2] SUCCESS: Found {result['total_crawled']} products! ({saved if save_to_db else 'Not saved'} items)",
-            ]
-        })
+        result = crawl_shopee_new(shop_url, target_count=target_count)
+        if result['success'] and not skip_db:
+            saved = save_products_to_db(result['products'])
+            result['saved_to_db'] = saved
+        return jsonify(result)
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @main_bp.route('/api/admin/classify-products', methods=['POST'])
 def classify_products_route():
     data = request.get_json()
     shop_id = data.get('shop_id')
 
-    # Fetch non-classified products from DB
+    # Lấy sản phẩm chưa classify từ DB
     import sqlite3 as sql
     base_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
@@ -2858,7 +2165,7 @@ def classify_products_route():
     conn.close()
 
     if not products:
-        return jsonify({'message': 'No products to classify', 'classified': 0, 'saved': 0})
+        return jsonify({'message': 'Không có sản phẩm nào cần classify', 'classified': 0, 'saved': 0})
 
     try:
         classified = batch_classify(products, analyze_images=True)
@@ -2866,103 +2173,6 @@ def classify_products_route():
         return jsonify({'success': True, 'classified': len(classified), 'saved': saved})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-@main_bp.route('/api/crawl/save', methods=['POST'])
-def save_crawled_products():
-    """Save products from frontend preview to DB using SQLAlchemy for consistency"""
-    data = request.get_json()
-    products_data = data.get("products", [])
-    shop_name = data.get("shop_name", "")
-    shop_url = data.get("shop_url", "")
-
-    if not products_data:
-        return jsonify({"success": False, "message": "No products to save"}), 400
-
-    try:
-        saved_count = 0
-        for p_data in products_data:
-            item_id = str(p_data.get('id') or p_data.get('item_id'))
-            if not item_id: continue
-            
-            product = Product.query.filter_by(item_id=item_id).first()
-            if not product:
-                product = Product(item_id=item_id)
-                db.session.add(product)
-            
-            product.name = (p_data.get('name') or '')[:200]
-            product.image_url = (p_data.get('image_url') or '')[:500]
-            product.product_url = (p_data.get('product_url') or '')[:2000]
-            product.price = p_data.get('price')
-            product.price_display = p_data.get('price_display')
-            product.shop_name = (shop_name or p_data.get('shop_name') or 'Shopee')[:150]
-            product.shop_id = str(p_data.get('shop_id') or '')[:100]
-            product.rating = float(p_data.get('rating') or 0)
-            product.sold_count = int(p_data.get('sold_count') or 0)
-            product.is_active = True
-            product.is_valid = True
-            
-            # Category Mapping
-            shopee_cat = p_data.get('category')
-            it_name, sub_cat = map_to_canonical_clothing(
-                ai_category=None, 
-                item_type_raw=None, 
-                shopee_cat=shopee_cat
-            )
-            
-            if not it_name:
-                # Try infer by name
-                it_name, sub_cat = infer_canonical_category_by_name(product.name)
-
-            product.category_label = it_name or 'Other'
-            product.sub_category_label = sub_cat or 'Other'
-            
-            # Set foreign keys
-            item_type = ItemType.query.filter_by(name=product.category_label).first()
-            if item_type:
-                product.item_type_id = item_type.id
-                category = Category.query.filter_by(name=product.sub_category_label, item_type_id=item_type.id).first()
-                if category:
-                    product.category_id = category.id
-            
-            saved_count += 1
-
-        # Save shop info if shop_id exists
-        if products_data and (products_data[0].get("shop_id") or shop_name):
-            s_id = str(products_data[0].get("shop_id") or "")
-            d_name = shop_name or f"Shop {s_id}"
-            
-            # Update shops table via raw SQL or SQLAlchemy if model exists
-            # We use raw SQL for shops table as it might not be a full model yet
-            import sqlite3
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            db_path = os.path.abspath(os.path.join(base_dir, '..', '..', 'database', 'database_v2.db'))
-            
-            try:
-                conn = sqlite3.connect(db_path)
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS shops 
-                    (shop_id TEXT PRIMARY KEY, display_name TEXT, shop_url TEXT,
-                     last_crawled TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-                """)
-                conn.execute("""
-                    INSERT OR REPLACE INTO shops (shop_id, display_name, shop_url, last_crawled)
-                    VALUES (?,?,?, CURRENT_TIMESTAMP)
-                """, (s_id, d_name, shop_url))
-                conn.commit()
-                conn.close()
-            except Exception as e:
-                print(f"Failed to save shop info: {e}")
-
-        db.session.commit()
-
-        return jsonify({
-            "success": True, 
-            "saved_count": saved_count,
-            "message": f"Successfully saved {saved_count} products"
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
 
 @main_bp.route('/api/admin/shop-profile/<shop_id>')
 def get_shop_profile_route(shop_id):

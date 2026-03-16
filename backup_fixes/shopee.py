@@ -21,6 +21,7 @@ try:
 except ImportError:
     HAS_FEATURE_EXTRACTOR = False
 
+# --- Logger Setup ---
 logger = logging.getLogger("shopee.ultimate")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -46,7 +47,7 @@ class ShopeeCrawler:
             parsed = urlparse(raw_url)
             path_parts = [p for p in parsed.path.strip('/').split('/') if p]
             if not path_parts: return raw_url
-
+            
             # If it's a product link or have query params, just get the first part as shop name
             shop_name = path_parts[0]
             return f"https://shopee.vn/{shop_name}"
@@ -105,7 +106,7 @@ class ShopeeCrawler:
         """🥉 Extract product links using regex."""
         links = []
         # Pattern 1: SEO links (-i.SHOPID.ITEMID)
-        matches_seo = re.findall(r'href="(/[^\"]+?-i\.(\d+)\.(\d+))', html)
+        matches_seo = re.findall(r'href="(/[^"]+?-i\.(\d+)\.(\d+))', html)
         for link, sid, iid in matches_seo:
             links.append(f"https://shopee.vn/product/{sid}/{iid}")
         # Pattern 2: Standard links (/product/SHOPID/ITEMID)
@@ -114,7 +115,7 @@ class ShopeeCrawler:
             links.append(f"https://shopee.vn/product/{sid}/{iid}")
         return list(set(links))
 
-    def _parse_product_detail(self, html: str, url: str) -> Optional[Dict]:
+    def _parse_product_detail(self, html: str, url: str) -> Optional[List[Dict]]:
         """🧬 Ultimate Parser: NEXT_DATA + LD+JSON Fallback."""
         # --- Case 1: __NEXT_DATA__ ---
         match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.DOTALL)
@@ -124,7 +125,9 @@ class ShopeeCrawler:
                 pinfo = data.get("props", {}).get("pageProps", {}).get("productInfo") or \
                         data.get("props", {}).get("pageProps", {}).get("item")
                 if pinfo:
-                    return self._build_item_from_json(pinfo, url)
+                    # Build variant-aware items
+                    items = self._build_items_from_json(pinfo, url)
+                    return items
             except: pass
 
         # --- Case 2: application/ld+json ---
@@ -142,7 +145,7 @@ class ShopeeCrawler:
         if ld_prod:
             name = ld_prod.get("name", "")
             sid, iid = self.current_shopid, ld_prod.get("productID", "")
-
+            
             # Try extract IDs from current URL if possible
             m1 = re.search(r"-i\.(\d+)\.(\d+)", url)
             m2 = re.search(r"product/(\d+)/(\d+)", url)
@@ -161,7 +164,7 @@ class ShopeeCrawler:
                 parts = [p for p in parts if p and p != name]
                 if parts: cat_leaf = parts[-1]
 
-            return self._finalize_item(name, sid, iid, price_vnd, cat_leaf, ld_prod.get("image", ""), url)
+            return [self._finalize_item(name, sid, iid, price_vnd, cat_leaf, ld_prod.get("image", ""), url)]
 
         return None
 
@@ -170,23 +173,23 @@ class ShopeeCrawler:
         name = item.get("name", "")
         iid = str(item.get("itemid", ""))
         sid = str(item.get("shopid", "")) or self.current_shopid
-
+        
         # Price: Models or item price
         models = item.get("models", [])
         p_raw = models[0].get("price", 0) if models else item.get("price", 0)
         price_vnd = self._price(p_raw)
-
+        
         # Category: Last in list
         cats = item.get("categories", [])
         cat_leaf = cats[-1].get("display_name", "Other") if cats else "Other"
-
+        
         return self._finalize_item(name, sid, iid, price_vnd, cat_leaf, item.get("image", ""), url)
 
-    def _finalize_item(self, name, shopid, itemid, price, cat_leaf, img_hash, url) -> Dict:
+    def _finalize_item(self, name, shopid, itemid, price, cat_leaf, img_hash, url, variant_color: Optional[str] = None) -> Dict:
         """✨ Finalize Record: Correct Links + AI Classification."""
         sid = shopid or self.current_shopid
         slug = self._generate_slug(name)
-
+        
         # FIX: Link chuẩn mở 100% – luôn dùng dạng /product/SHOPID/ITEMID
         # Dạng này là canonical của Shopee và luôn redirect đúng trang chi tiết.
         if sid and itemid:
@@ -195,7 +198,7 @@ class ShopeeCrawler:
             product_url = url
 
         # Image
-        if img_hash and not img_hash.startswith("http"):
+        if img_hash and not str(img_hash).startswith("http"):
             image_url = f"https://cf.shopee.vn/file/{img_hash}"
         else:
             image_url = img_hash
@@ -206,8 +209,21 @@ class ShopeeCrawler:
             try: ai = FeatureExtractor.extract(name, cat_leaf) or {}
             except: pass
 
+        # If variant color provided, prefer that as color hint for normalization
+        color_hint = variant_color or ai.get("color", "")
+
+        # Create stable numeric variant_id when variant_color provided to avoid DB collision
+        variant_id = None
+        if variant_color:
+            try:
+                import zlib
+                variant_id = int(zlib.adler32(f"{itemid}|{variant_color}".encode('utf-8')) & 0x7FFFFFFF)
+            except Exception:
+                variant_id = None
+
         return {
             "itemid": itemid,
+            "variant_id": variant_id,
             "shopid": sid,
             "name": name,
             "price": price,
@@ -220,9 +236,105 @@ class ShopeeCrawler:
             "ai_category": ai.get("category", ""),
             "item_type": ai.get("item_type", ""),
             "style": ai.get("style", ""),
-            "color": ai.get("color", ""),
+            "color": color_hint,
+            "variant_color": variant_color or "",
             "season": ai.get("season", "")
         }
+
+    def _build_items_from_json(self, item: Dict, url: str) -> List[Dict]:
+        """
+        Build items with color variants. Prefer color-tier images over the main image.
+        """
+        name = item.get("name", "")
+        iid = str(item.get("itemid", ""))
+        sid = str(item.get("shopid", "")) or self.current_shopid
+        cats = item.get("categories", [])
+        cat_leaf = cats[-1].get("display_name", "Other") if cats else "Other"
+        models = item.get("models", []) or []
+        tiers = item.get("tier_variations", []) or []
+        all_images = item.get("images") or []
+
+        def _resolve_img(val):
+            # Shopee either returns hash or index into item.images
+            if isinstance(val, str) and val:
+                return val
+            try:
+                idx = int(val)
+                if 0 <= idx < len(all_images):
+                    return all_images[idx]
+            except Exception:
+                pass
+            # fallback to main image hash
+            return item.get("image", "")
+
+        # Identify color tier index
+        color_idx = None
+        for idx, tv in enumerate(tiers):
+            label = (tv.get("name") or "").lower()
+            if any(k in label for k in ["màu", "mau", "color", "colour", "颜色", "顏色"]):
+                color_idx = idx
+                break
+        if color_idx is None and tiers:
+            # fallback: pick a tier that has images per option
+            for idx, tv in enumerate(tiers):
+                imgs = tv.get("images") or []
+                opts = tv.get("options") or []
+                if imgs and len(imgs) == len(opts):
+                    color_idx = idx
+                    break
+
+        # Map color options to their image hashes
+        color_options = []
+        if color_idx is not None:
+            tv = tiers[color_idx]
+            opts = tv.get("options") or []
+            imgs = tv.get("images") or []
+            for i, opt in enumerate(opts):
+                raw_img = imgs[i] if i < len(imgs) else item.get("image", "")
+                img_hash = _resolve_img(raw_img)
+                color_options.append({"index": i, "name": opt, "img": img_hash})
+
+        results: List[Dict] = []
+        if color_options:
+            # Build one item per color option, choose price from models that match this color index
+            for opt in color_options:
+                price_for_opt = None
+                for m in models:
+                    tindex = m.get("tier_index") or m.get("tier_indexs") or m.get("tier_parent_index") or []
+                    if isinstance(tindex, list):
+                        if len(tindex) >= (color_idx + 1) and tindex[color_idx] == opt["index"]:
+                            price_for_opt = self._price(m.get("price", 0))
+                            break
+                price_vnd = price_for_opt if price_for_opt is not None else self._price(item.get("price", 0))
+                rec = self._finalize_item(name, sid, iid, price_vnd, cat_leaf, opt["img"], url, variant_color=opt["name"])
+                rec["images_all"] = item.get("images") or []
+                results.append(rec)
+        else:
+            # No color tier → single item using main image
+            # Fallback: if models have names that look like colors, emit one item per model
+            emitted = False
+            if models:
+                for m in models:
+                    mname = str(m.get("name") or m.get("model_name") or "").strip()
+                    if mname:
+                        price_vnd = self._price(m.get("price", 0) or item.get("price", 0))
+                        img_hash = item.get("image", "")
+                        # Try model-specific image field if exists
+                        mh = m.get("image") or m.get("img") or None
+                        if mh:
+                            img_hash = _resolve_img(mh)
+                        rec = self._finalize_item(name, sid, iid, price_vnd, cat_leaf, img_hash, url, variant_color=mname)
+                        rec["images_all"] = item.get("images") or []
+                        results.append(rec)
+                        emitted = True
+            if not emitted:
+                p_raw = models[0].get("price", 0) if models else item.get("price", 0)
+                price_vnd = self._price(p_raw)
+                rec = self._finalize_item(name, sid, iid, price_vnd, cat_leaf, item.get("image", ""), url)
+                rec["images_all"] = item.get("images") or []
+                results.append(rec)
+
+        return results
 
     def crawl(self, shop_url: str) -> List[Dict]:
         """Crawl Pipeline."""
@@ -242,7 +354,7 @@ class ShopeeCrawler:
         # Find initial product
         query_params = parse_qs(urlparse(shop_url).query)
         initial_item_id = query_params.get("itemId", [None])[0]
-
+        
         product_links = []
         if initial_item_id and self.current_shopid:
             product_links.append(f"https://shopee.vn/product/{self.current_shopid}/{initial_item_id}")
@@ -271,24 +383,38 @@ class ShopeeCrawler:
             try:
                 p_resp = self.session.get(url, timeout=15)
                 if p_resp.status_code == 200:
-                    item = self._parse_product_detail(p_resp.text, url)
-                    if not item:
+                    items = self._parse_product_detail(p_resp.text, url)
+                    if not items:
                         time.sleep(random.uniform(1, 2))
                         continue
 
                     # Bỏ sản phẩm có giá 0 hoặc thiếu giá
-                    price_val = float(item.get("price") or 0)
-                    if price_val <= 0:
+                    # Filter out any with invalid price
+                    valid_items = []
+                    for it in items if isinstance(items, list) else [items]:
+                        price_val = float(it.get("price") or 0)
+                        if price_val > 0:
+                            valid_items.append(it)
+                    if not valid_items:
                         time.sleep(random.uniform(1, 2))
                         continue
 
                     # Phân loại tuyệt đối: chỉ giữ sản phẩm có ai_category hợp lệ
-                    ai_cat = (item.get("ai_category") or "").strip()
-                    if HAS_FEATURE_EXTRACTOR and (not ai_cat or ai_cat.lower() == "other"):
+                    # Phân loại tuyệt đối: giữ items có ai_category hợp lệ
+                    filtered = []
+                    for it in valid_items:
+                        ai_cat = (it.get("ai_category") or "").strip()
+                        if not HAS_FEATURE_EXTRACTOR or (ai_cat and ai_cat.lower() != "other"):
+                            filtered.append(it)
+                    if not filtered:
                         time.sleep(random.uniform(1, 2))
                         continue
 
-                    results.append(item)
+                    # Merge while respecting overall limit
+                    for it in filtered:
+                        results.append(it)
+                        if len(results) >= self.limit:
+                            break
                 time.sleep(random.uniform(1, 2))
             except:
                 pass
@@ -308,4 +434,4 @@ if __name__ == "__main__":
     import sys
     url = sys.argv[1] if len(sys.argv) > 1 else "https://shopee.vn/vierlin"
     data = crawl_shop_url(url, limit=5)
-    print(json.dumps(data, indent=2, ensure_ascii=False))
+    print(json.dumps(data, indent=2, ensure_ascii=True))

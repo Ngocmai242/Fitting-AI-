@@ -9,6 +9,62 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 
 db = SQLAlchemy()
 
+def _ensure_tryon_schema(db_path: str) -> None:
+    """
+    Best-effort SQLite migration for Virtual Try-On.
+    Adds required columns for filtering + shopee_url without breaking existing installs.
+    """
+    try:
+        import sqlite3
+
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+
+        # Ensure products table exists (minimal schema; won't override an existing richer table)
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS products (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                name            TEXT NOT NULL,
+                price           REAL,
+                image_url       TEXT,
+                shopee_url      TEXT,
+                gender          TEXT DEFAULT 'female',
+                occasion        TEXT DEFAULT 'casual',
+                style_tag       TEXT,
+                body_shape_tag  TEXT,
+                created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        cur.execute("PRAGMA table_info(products)")
+        existing_cols = {row[1] for row in cur.fetchall()}  # (cid, name, type, notnull, dflt, pk)
+
+        def add_col_if_missing(col_sql: str, col_name: str) -> None:
+            if col_name in existing_cols:
+                return
+            try:
+                cur.execute(col_sql)
+                existing_cols.add(col_name)
+            except Exception:
+                # Ignore: if table is locked or SQLite rejects an alter due to constraints
+                pass
+
+        add_col_if_missing("ALTER TABLE products ADD COLUMN shopee_url TEXT;", "shopee_url")
+        add_col_if_missing("ALTER TABLE products ADD COLUMN gender TEXT DEFAULT 'female';", "gender")
+        add_col_if_missing("ALTER TABLE products ADD COLUMN occasion TEXT DEFAULT 'casual';", "occasion")
+        add_col_if_missing("ALTER TABLE products ADD COLUMN style_tag TEXT;", "style_tag")
+        add_col_if_missing("ALTER TABLE products ADD COLUMN body_shape_tag TEXT;", "body_shape_tag")
+        add_col_if_missing("ALTER TABLE products ADD COLUMN image_url TEXT;", "image_url")
+
+        conn.commit()
+        conn.close()
+    except Exception:
+        # Never block server startup on migration failures
+        return
+
 
 def create_app():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +86,9 @@ def create_app():
 
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    # Must run before importing models/routes to avoid "no such column" if new columns are added.
+    _ensure_tryon_schema(db_path)
 
     db.init_app(app)
 

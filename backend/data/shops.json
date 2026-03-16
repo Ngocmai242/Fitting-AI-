@@ -18,5 +18,17 @@
   "CAMA STORE": {
     "shop_name": "CAMA STORE",
     "shop_url": "https://shopee.vn/camastore"
+  },
+  "SU CHANG": {
+    "shop_name": "SU CHANG",
+    "shop_url": "https://shopee.vn/suchangvn?categoryId=100017&entryPoint=ShopByPDP&itemId=40328850880"
+  },
+  "Nutriboost93": {
+    "shop_name": "Nutriboost93",
+    "shop_url": "https://shopee.vn/nutriboost93?categoryId=100011&entryPoint=ShopByPDP&itemId=25513350753"
+  },
+  "Zenkonu Clothes": {
+    "shop_name": "Zenkonu Clothes",
+    "shop_url": "https://shopee.vn/zenkonu?categoryId=100011&entryPoint=ShopByPDP&itemId=16172489595"
   }
 }

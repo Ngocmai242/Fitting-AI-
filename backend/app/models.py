@@ -89,6 +89,10 @@ class Product(db.Model):
     name = db.Column(db.String(200), nullable=False)
     image_url = db.Column(db.String(500))
     product_url = db.Column(db.String(2000))
+    # Virtual Try-On / Smart Styling
+    shopee_url = db.Column(db.Text)
+    style_tag = db.Column(db.Text)
+    body_shape_tag = db.Column(db.Text)
     price = db.Column(db.Integer)
     price_display = db.Column(db.String(50))
     details = db.Column(db.String(200))
@@ -115,6 +119,12 @@ class Product(db.Model):
     material = db.Column(db.String(100))
     fit_type = db.Column(db.String(50))
     color_tone = db.Column(db.String(20))
+    clean_image_path = db.Column(db.String(255))
+    color_primary = db.Column(db.String(50))
+    color_secondary = db.Column(db.String(50))
+    hex_primary = db.Column(db.String(10))
+    season = db.Column(db.String(50))
+    occasion = db.Column(db.String(50))
 
     # Denormalized labels for backwards compatibility with existing UI
     category_label = db.Column(db.String(50))

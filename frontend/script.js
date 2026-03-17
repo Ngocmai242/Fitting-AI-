@@ -77,7 +77,7 @@ function cropFaceFromKeypoints(img, kp) {
 
 // Helper to get full image URL
 function getImageUrl(path) {
-    if (!path) return null;
+    if (!path) return 'https://placehold.co/200x260?text=No+Image';
     if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) {
         return path;
     }
@@ -93,6 +93,44 @@ function scrollToSection(id) {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// Navbar: Virtual Try-On submenu router
+// Returns false to prevent default link navigation
+window.navTryon = function (action) {
+    try {
+        const to = (action || 'upload').toLowerCase();
+
+        // Prefer dedicated Try-On page if present
+        const tryonUrl = new URL('tryon.html', window.location.href);
+
+        if (to === 'upload') {
+            tryonUrl.searchParams.set('action', 'upload');
+            window.location.href = tryonUrl.toString();
+            return false;
+        }
+        if (to === 'garment') {
+            tryonUrl.searchParams.set('action', 'garment');
+            window.location.href = tryonUrl.toString();
+            return false;
+        }
+        if (to === 'result') {
+            tryonUrl.searchParams.set('action', 'result');
+            window.location.href = tryonUrl.toString();
+            return false;
+        }
+        if (to === 'compare') {
+            alert('Tính năng đang phát triển');
+            return false;
+        }
+
+        tryonUrl.searchParams.set('action', 'upload');
+        window.location.href = tryonUrl.toString();
+        return false;
+    } catch (e) {
+        console.warn('navTryon error', e);
+        return false;
+    }
+};
 
 // Helper to construct Avatar URL with cache busting
 function getAvatarUrl(user) {

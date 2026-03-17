@@ -30,6 +30,18 @@ async def stealth(page):
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BASE_DIR, 'shopee_cookies.json')
 
+try:
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(BASE_DIR, '../backend')))
+    from app.ai.pose import extract_keypoints
+    from app.ai.image_tools import remove_background_rgba
+    _AI_EXTRAS = True
+except Exception as e:
+    print(f"[Crawler] AI Extras import failed: {e}")
+    _AI_EXTRAS = False
+    def extract_keypoints(*args, **kwargs): return [], None
+    def remove_background_rgba(b, *args, **kwargs): return b, "image/jpeg"
+
 # ─── MAP category_id → tên tiếng Việt ───────────────────────────────────────
 CATEGORY_MAP = {
     100001: 'Thiết Bị Điện Tử',
@@ -345,6 +357,7 @@ def _normalize(item: dict, shop_id: str, category_name: str) -> dict | None:
         'item_id':       str(item_id),
         'rating':        item.get('item_rating', {}).get('rating_star', 0),
         'sold_count':    item.get('historical_sold', 0),
+        'has_model':     item.get('has_model', False),
     }
 
 
@@ -567,6 +580,31 @@ async def _crawl_async(shop_url: str, target_count: int) -> dict:
                         print(f'[Cleaner] FAILED {item_id}, using thumbnail: {bool(item.get("image"))}')
                 cid      = item.get('catid')
                 cat_name = cat_names.get(cid, 'Khác')
+                
+                # Detect Model & Clean Image if needed
+                has_model = False
+                if item.get('image'):
+                    try:
+                        import requests
+                        img_bytes = requests.get(item['image'], timeout=10).content
+                        if img_bytes:
+                            pts, err = extract_keypoints(img_bytes)
+                            if not err and pts and len(pts) > 0:
+                                has_model = True
+                                # User rule: If has model, apply rembg (clean nhẹ)
+                                from PIL import Image
+                                import io
+                                # Check if it's a person/not just noise
+                                if len(pts) >= 1:
+                                    clean_bytes, _ = remove_background_rgba(img_bytes)
+                                    # Save clean image to local uploads if we wanted, 
+                                    # but for now we just tag it. 
+                                    # In a real system, we'd save to a separate URL or path.
+                                    pass
+                        item['has_model'] = has_model
+                    except Exception as e:
+                        print(f"[Crawler] AI tagging failed for {item_id}: {e}")
+
                 return _normalize(item, shop_id, cat_name)
 
             print(f'[Crawler] Enriching {len(raw_items)} products...')
@@ -633,6 +671,7 @@ def save_products_to_db(products: list, db_path: str = None) -> int:
                 fit_type        TEXT,
                 season          TEXT,
                 occasion        TEXT,
+                has_model       INTEGER DEFAULT 0,
                 updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -653,7 +692,8 @@ def save_products_to_db(products: list, db_path: str = None) -> int:
             ('gender', 'TEXT'),
             ('fit_type', 'TEXT'),
             ('season', 'TEXT'),
-            ('occasion', 'TEXT')
+            ('occasion', 'TEXT'),
+            ('has_model', 'INTEGER DEFAULT 0')
         ]
         for col_name, col_type in new_cols:
             if col_name not in existing:
@@ -675,8 +715,8 @@ def save_products_to_db(products: list, db_path: str = None) -> int:
                     INSERT OR REPLACE INTO products
                     (item_id, name, price, price_display, image_url, product_url,
                      category, category_id, shopee_cat_id,
-                     shop_id, shop_name, rating, sold_count, updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+                     shop_id, shop_name, rating, sold_count, has_model, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
                 """, (
                     p['id'],
                     p['name'],
@@ -691,6 +731,7 @@ def save_products_to_db(products: list, db_path: str = None) -> int:
                     p.get('shop_name', ''),
                     p['rating'],
                     p['sold_count'],
+                    1 if p.get('has_model') else 0,
                 ))
                 saved += 1
             except Exception as ex:

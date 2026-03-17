@@ -17,21 +17,9 @@
         <div class="logo">AuraFit</div>
         <div class="nav-links">
             <a href="#home" onclick="scrollToSection('home-view')"><span></span>Home</span></a>
-            <a href="tryon.html" class="nav-highlight"><span>✨ Virtual Try-On</span></a>
 
-            <!-- Virtual Try-On Dropdown -->
-            <div class="nav-item-container">
-                <a href="#tryon" onclick="scrollToSection('tryon')"><span>Virtual Try-On</span> <i
-                        class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 5px;"></i></a>
-                <div class="nav-dropdown">
-                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-upload"></i> Upload User Photo</a>
-                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-tshirt"></i> Try
-                        Tops/Bottoms/Dresses</a>
-                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-user-check"></i> Display on User
-                        Body</a>
-                    <a href="#" onclick="scrollToSection('tryon')"><i class="fas fa-columns"></i> Compare Outfits</a>
-                </div>
-            </div>
+            <!-- Virtual Try-On Direct Link -->
+            <a href="tryon.html" class="nav-link nav-tryon">✨ Virtual Try-On</a>
 
             <!-- Body Analysis Dropdown -->
             <div class="nav-item-container">
@@ -164,7 +152,7 @@
                     <div class="slide-overlay">
                         <h2>Party Glam</h2>
                         <p>Stand out from the crowd</p>
-                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                        <button class="slide-cta" onclick="window.location.href='tryon.html'">Try Now</button>
                     </div>
                 </div>
                 <!-- Slide 9 -->
@@ -173,7 +161,7 @@
                     <div class="slide-overlay">
                         <h2>Active & Sporty</h2>
                         <p>Ready for every activity</p>
-                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                        <button class="slide-cta" onclick="window.location.href='tryon.html'">Try Now</button>
                     </div>
                 </div>
                 <!-- Slide 10 -->
@@ -183,7 +171,7 @@
                     <div class="slide-overlay">
                         <h2>Boho Chic</h2>
                         <p>Free and spirited</p>
-                        <button class="slide-cta" onclick="scrollToSection('tryon')">Try Now</button>
+                        <button class="slide-cta" onclick="window.location.href='tryon.html'">Try Now</button>
                     </div>
                 </div>
             </div>
@@ -205,7 +193,7 @@
                     Features</h2> <!-- English -->
                 <!-- Added margin-bottom to align with visual rhythm -->
                 <div class="feature-grid" style="margin-bottom: 2rem;">
-                    <div class="feature-card" onclick="scrollToSection('tryon')">
+                    <div class="feature-card" onclick="window.location.href='tryon.html'">
                         <div class="icon-bubble"><i class="fas fa-tshirt"></i></div>
                         <h3>Virtual Try-On</h3> <!-- English -->
                         <p>Upload photo and try on clothes directly on your body.</p>
@@ -228,92 +216,6 @@
                 </div>
             </section>
 
-            <!-- A. Virtual Try-On Demo (Reimagined as Full AI Styling Workflow) -->
-            <section id="tryon" class="tryon-section-bg" style="padding: 5rem 2rem; background: linear-gradient(135deg, #fdfbf7 0%, #fff0f3 100%);">
-                <div style="max-width: 1200px; margin: 0 auto;">
-                    <h2 class="section-title" style="display: flex; align-items: center; margin-bottom: 2.5rem;">
-                        <span style="display: inline-block; width: 4px; height: 1.2em; background: linear-gradient(180deg, #A8D8FF 0%, #FFB6D9 100%); margin-right: 0.8em; border-radius: 2px;"></span>
-                        Virtual Try-On & Smart Styling
-                    </h2>
-
-                    <div class="tryon-workflow-container" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 3rem; align-items: start;">
-                        <!-- Step 1: Upload & Context -->
-                        <div class="tryon-input-panel" style="background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.05); border: 1px solid #ffeef2;">
-                            <h3 style="color: var(--pastel-pink-dark); margin-bottom: 1.5rem;"><i class="fas fa-camera"></i> 1. Upload Your Photo</h3>
-                            <p style="font-size: 0.95rem; color: #666; margin-bottom: 20px;">Upload a full-body photo. Our AI will analyze your anatomy to suggest the best fits.</p>
-                            
-                            <div id="tryon-dropzone" onclick="document.getElementById('tryon-file-input').click()" 
-                                 style="border: 2px dashed var(--pastel-pink); border-radius: 12px; height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #fffcfc; cursor: pointer; transition: 0.3s; position: relative; overflow: hidden;">
-                                <div id="tryon-upload-prompt">
-                                    <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--pastel-blue); margin-bottom: 1rem;"></i>
-                                    <p><strong>Click to upload</strong></p>
-                                    <p style="font-size: 0.8rem; color: #999;">PNG, JPG supported</p>
-                                </div>
-                                <img id="tryon-preview-img" style="display:none; width:100%; height:100%; object-fit:contain;">
-                                <input type="file" id="tryon-file-input" accept="image/*" style="display: none;" onchange="handleTryOnUpload(this)">
-                            </div>
-
-                            <div style="margin-top:25px;">
-                                <h3 style="color: var(--pastel-pink-dark); margin-bottom: 1rem;"><i class="fas fa-sliders-h"></i> 2. Select Vibes</h3>
-                                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
-                                    <div>
-                                        <label style="font-size:0.85rem; font-weight:600; color:#555;">Gender</label>
-                                        <select id="tryon-gender" style="width:100%; padding:8px; border-radius:8px; border:1px solid #eee;">
-                                            <option value="Female">Female</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Unisex">Unisex</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style="font-size:0.85rem; font-weight:600; color:#555;">Occasion</label>
-                                        <select id="tryon-occasion" style="width:100%; padding:8px; border-radius:8px; border:1px solid #eee;">
-                                            <option value="Play">Casual / Play</option>
-                                            <option value="Tet">Lunar New Year (Tết)</option>
-                                            <option value="Noel">Christmas (Noel)</option>
-                                            <option value="Work">Office / Work</option>
-                                            <option value="Party">Party / Event</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style="font-size:0.85rem; font-weight:600; color:#555;">Style</label>
-                                        <select id="tryon-style" style="width:100%; padding:8px; border-radius:8px; border:1px solid #eee;">
-                                            <option value="">Any Style</option>
-                                            <option value="Casual">Casual</option>
-                                            <option value="Office">Office</option>
-                                            <option value="Streetwear">Streetwear</option>
-                                            <option value="Elegant">Elegant</option>
-                                            <option value="Vintage">Vintage</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style="font-size:0.85rem; font-weight:600; color:#555;">Body Shape</label>
-                                        <select id="tryon-shape-manual" style="width:100%; padding:8px; border-radius:8px; border:1px solid #eee;">
-                                            <option value="">Auto Detect (AI)</option>
-                                            <option value="Hourglass">Hourglass</option>
-                                            <option value="Pear">Pear</option>
-                                            <option value="Apple">Apple</option>
-                                            <option value="Rectangle">Rectangle</option>
-                                            <option value="Inverted Triangle">Inverted Triangle</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <button class="btn btn-primary" onclick="runFullStylingWorkflow()" style="margin-top:20px; width:100%; font-weight:700; background:linear-gradient(90deg, var(--pastel-blue-dark), var(--pastel-pink-dark));">
-                                    <i class="fas fa-wand-magic-sparkles"></i> MAGIC COORDINATE
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Step 2: Output -->
-                        <div class="tryon-output-panel" id="tryon-result-area">
-                            <div style="background: rgba(255,255,255,0.7); border: 2px dashed #ffc6d9; border-radius: 20px; height: 550px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #888; text-align: center; padding: 2rem; backdrop-filter: blur(5px);">
-                                <div style="font-size: 5rem; margin-bottom: 1.5rem; opacity: 0.3;">✨</div>
-                                <h3 style="color: var(--pastel-pink-dark);">AI STYLING BOARD</h3>
-                                <p style="max-width: 300px;">Experience <strong>True Virtual Styling</strong>. Upload your photo and choose your vibes to see how AI transforms your look!</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             <!-- B. Body Analysis -->
             <section id="analysis" style="padding: 4rem 2rem; background: var(--bg-color);">

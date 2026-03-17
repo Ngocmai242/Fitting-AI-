@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aurafit | AI Virtual Try-On & Styling</title>
+    <title>Virtual Try-On & Smart Styling — Aurafit</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -304,6 +304,15 @@
         </div>
     </nav>
 
+    <div style="max-width: 1200px; margin: 2.2rem auto 0; padding: 0 1rem;">
+        <h1 style="font-family: 'Playfair Display', serif; color: var(--text); font-size: 2.2rem; margin-bottom: 0.5rem;">
+            Virtual Try-On &amp; Smart Styling
+        </h1>
+        <p style="color: var(--muted); margin-bottom: 1.2rem;">
+            Upload ảnh của bạn, chọn vibes, rồi để AI phối đồ và gợi ý outfit phù hợp.
+        </p>
+    </div>
+
     <div class="container">
         <!-- Input Panel -->
         <div class="input-panel">
@@ -378,6 +387,17 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Loại đồ muốn thử</label>
+                    <select id="garment_type">
+                        <option value="any">Bất kỳ</option>
+                        <option value="tops">Áo (Tops)</option>
+                        <option value="bottoms">Quần (Bottoms)</option>
+                        <option value="dress">Đầm / Váy</option>
+                        <option value="full outfit">Full Outfit (Áo + Quần)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label>Ngân sách</label>
                     <select id="budget">
                         <option value="any">Không giới hạn</option>
@@ -407,6 +427,9 @@
                     <div class="badge-ai">AI Styled ✨</div>
                     <img id="result-img" src="" alt="Result">
                 </div>
+                
+                <div id="triedOutfitBanner" style="display:none; padding:10px 14px; background:#fff3e0; border-radius:8px; margin-top:10px; font-size:0.88rem; color:#333; margin-bottom: 1.5rem;">
+                </div>
 
                 <p style="text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
                     🛍️ Nhấn vào outfit bên dưới để mua trên Shopee
@@ -429,8 +452,16 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        const API_BASE = window.location.origin;
+        const API_BASE = "http://localhost:8080";
         let selectedFile = null;
+
+        function getParam(name) {
+            try {
+                return new URLSearchParams(window.location.search).get(name);
+            } catch (e) {
+                return null;
+            }
+        }
 
         function handleFileSelect(input) {
             if (input.files && input.files[0]) {
@@ -478,6 +509,7 @@
                 formData.append('style', document.getElementById('style').value);
                 formData.append('body_shape', document.getElementById('body_shape').value);
                 formData.append('budget', document.getElementById('budget').value);
+                formData.append('garment_type', document.getElementById('garment_type') ? document.getElementById('garment_type').value : 'any');
 
                 const response = await fetch(`${API_BASE}/api/virtual-tryon`, {
                     method: 'POST',
@@ -504,16 +536,26 @@
         function showResult(data) {
             document.getElementById('result-empty').style.display = 'none';
             document.getElementById('result-filled').style.display = 'block';
-            document.getElementById('result-img').src = data.result_image_url;
+            document.getElementById('result-img').src = data.result_image_url + "?nocache=" + Date.now();
+            
+            if (data.tried_outfit) {
+                const t = data.tried_outfit;
+                const banner = document.getElementById('triedOutfitBanner');
+                banner.innerHTML = `Đang mặc: <strong>${t.name}</strong> — ${formatPrice(t.price)} <a href="${t.shopee_url}" target="_blank" style="color: var(--rose); font-weight: bold; text-decoration: none; margin-left: 10px;">🛍 Mua ngay</a>`;
+                banner.style.display = 'block';
+            } else {
+                document.getElementById('triedOutfitBanner').style.display = 'none';
+            }
             
             const container = document.getElementById('outfit-cards');
             container.innerHTML = '';
             
             data.recommended_outfits.forEach(item => {
                 const card = document.createElement('a');
-                card.href = "javascript:void(0)";
+                card.href = item.shopee_url || '#';
+                card.target = "_blank";
+                card.rel = "noopener noreferrer";
                 card.className = 'outfit-card';
-                card.onclick = () => openShopee(item.shopee_url);
                 card.innerHTML = `
                     <img src="${item.image_url}" alt="${item.name}" onerror="this.src='https://placehold.co/200x260?text=No+Image'">
                     <div class="outfit-info">
@@ -550,6 +592,39 @@
                 t.className = 'toast';
             }, 3500);
         }
+
+        // Navbar submenu actions (from index.html dropdown)
+        (function initNavAction() {
+            const gt = (getParam('garment_type') || '').toLowerCase();
+            if (gt && document.getElementById('garment_type')) {
+                document.getElementById('garment_type').value = gt;
+            }
+            const action = (getParam('action') || '').toLowerCase();
+            if (action === 'upload') {
+                setTimeout(() => {
+                    const z = document.getElementById('upload-zone');
+                    if (z) z.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showToast('Chọn ảnh để bắt đầu Try-On', 'success');
+                    document.getElementById('file-input')?.click();
+                }, 350);
+            } else if (action === 'garment') {
+                setTimeout(() => {
+                    document.getElementById('garment_type')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showToast('Chọn loại đồ rồi nhấn Magic', 'success');
+                }, 350);
+            } else if (action === 'result') {
+                setTimeout(() => {
+                    const filled = document.getElementById('result-filled');
+                    if (filled && filled.style.display !== 'none') {
+                        filled.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        showToast('Vui lòng upload ảnh và nhấn Magic trước', 'error');
+                    }
+                }, 350);
+            } else if (action === 'compare') {
+                setTimeout(() => showToast('Tính năng đang phát triển', 'error'), 200);
+            }
+        })();
 
         // Drag & Drop
         const zone = document.getElementById('upload-zone');

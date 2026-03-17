@@ -30,70 +30,283 @@ from .models import (
     Style,
     User,
 )
-from gradio_client import Client, handle_file
 import json as _json
+
+import requests as _req, time as _time
+
+# AI Imports
+try:
+    from .ai.pose import extract_keypoints
+    from .ai.image_tools import remove_background_rgba, detect_clothing_color, recolor_clothing, upscale_image, change_background
+    from .ai.features import compute_ratios, estimate_gender, predict_shape_with_confidence
+    predict_shape = lambda *a, **kw: predict_shape_with_confidence(*a, **kw)[0]
+except ImportError as e:
+    print(f"[AI] Module import failed: {e}")
+    # Fallback to dummies if imports fail
+    def extract_keypoints(*args, **kwargs): return [], None
+    def compute_ratios(*args, **kwargs): return {}
+    def estimate_gender(*args, **kwargs): return "Unisex"
+    def predict_shape(*args, **kwargs): return "Rectangle"
+    def predict_shape_with_confidence(*args, **kwargs): return "Rectangle", 0.5
+    def remove_background_rgba(*args, **kwargs): return None, None
+    def recolor_clothing(*args, **kwargs): return None, None
+    def upscale_image(*args, **kwargs): return None, None
+    def change_background(*args, **kwargs): return None, None
+    def detect_clothing_color(*args, **kwargs): return "Multicolor", "Pattern"
+
+def _wake_space(space_id):
+    try:
+        # Pinging the space UI usually wakes it up if it's sleeping
+        _req.get(f"https://huggingface.co/spaces/{space_id}", timeout=8)
+        _time.sleep(4)
+    except Exception:
+        pass
+
+def _make_fallback(person_img_path):
+    """Tạo ảnh fallback: ảnh gốc + banner vàng ở dưới"""
+    out_name = f"fallback_{uuid.uuid4().hex}.jpg"
+    results_dir = os.path.join(current_app.static_folder, 'static', 'tryon_results')
+    os.makedirs(results_dir, exist_ok=True)
+    out_path = os.path.join(results_dir, out_name)
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.open(person_img_path).convert("RGB")
+        w, h = img.size
+        draw = ImageDraw.Draw(img)
+        # Use a default font
+        try:
+            # Typical Windows font paths or fallback to default
+            font = None
+            for font_path in ["arial.ttf", "C:\\Windows\\Fonts\\arial.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]:
+                try:
+                    font = ImageFont.truetype(font_path, 20)
+                    break
+                except: continue
+            if not font: font = ImageFont.load_default()
+        except IOError:
+            font = ImageFont.load_default()
+            
+        draw.rectangle([0, h - 44, w, h], fill=(255, 193, 7))
+        draw.text(
+            (10, h - 32),
+            "⚠  AI is busy — please try again later. Outfits below are still recommended!",
+            fill=(0, 0, 0),
+            font=font
+        )
+        img.save(out_path, "JPEG", quality=92)
+    except Exception:
+        shutil.copy(person_img_path, out_path)
+    return out_path
+
+def call_fashn_vton(person_path, garment_path, category="tops"):
+    """
+    Calls FASHN VTON v1.5 on Hugging Face (FREE 100%).
+    category in ["tops", "bottoms", "one-pieces"]
+    """
+    try:
+        from gradio_client import Client, handle_file
+    except ImportError:
+        print("[FASHN-VTON] gradio_client missing")
+        return person_path, True
+
+    # Use the official FASHN VTON space or a reliable mirror
+    space_id = "fashn-ai/fashn-vton-1.5"
+    hf_token = os.getenv("HF_TOKEN", "")
+    
+    # Normalize category for FASHN
+    cat_map = {
+        "tops": "tops", "top": "tops", "shirt": "tops", "ao": "tops",
+        "bottoms": "bottoms", "bottom": "bottoms", "pants": "bottoms", "quan": "bottoms",
+        "one-pieces": "one-pieces", "dress": "one-pieces", "vay": "one-pieces"
+    }
+    fashn_cat = cat_map.get(str(category).lower(), "tops")
+
+    try:
+        print(f"[FASHN-VTON] Connecting to {space_id}...")
+        _wake_space(space_id)
+        client = Client(space_id, hf_token=hf_token) if hf_token else Client(space_id)
+        
+        # FASHN API signature: 
+        # (person_img, garment_img, category, garment_des, denoise_steps, seed)
+        result = client.predict(
+            person_image=handle_file(person_path),
+            garment_image=handle_file(garment_path),
+            category=fashn_cat,
+            # FASHN v1.5 might have slightly different API names, 
+            # we'll let it try default predict or specify api_name if needed.
+        )
+        
+        # Result processing
+        result_raw = result[0] if isinstance(result, (list, tuple)) else result
+        if isinstance(result_raw, dict):
+            result_raw = result_raw.get("path") or result_raw.get("url") or str(result_raw)
+
+        results_dir = os.path.join(current_app.static_folder, "static", "tryon_results")
+        os.makedirs(results_dir, exist_ok=True)
+        out_name = f"fashn_{uuid.uuid4().hex}.png"
+        out_path = os.path.join(results_dir, out_name)
+        shutil.copy(str(result_raw), out_path)
+        
+        print(f"[FASHN-VTON] SUCCESS -> {out_path}")
+        return out_path, False
+    except Exception as e:
+        print(f"[FASHN-VTON] FAIL: {e}")
+        return person_path, True
+
+def _get_image_similarity(path1, path2):
+    """Simple check if two images are the same (pixel-wise or hash)"""
+    try:
+        from PIL import Image
+        import numpy as np
+        img1 = Image.open(path1).convert("L").resize((64, 64))
+        img2 = Image.open(path2).convert("L").resize((64, 64))
+        arr1 = np.array(img1).astype(float) / 255.0
+        arr2 = np.array(img2).astype(float) / 255.0
+        # Mean absolute difference
+        diff = np.mean(np.abs(arr1 - arr2))
+        # If diff < 0.05, they are > 95% similar
+        return 1.0 - diff
+    except Exception:
+        return 0.0
 
 def call_idm_vton(person_path, garment_path):
     """
     Calls IDM-VTON on Hugging Face Space to perform virtual try-on.
-    Returns local path to result image.
+    Returns (local_path, is_fallback).
     """
-    spaces = [
-        "freddyaboulton/IDM-VTON",
-        "yisol/IDM-VTON",
-        "adi1516/IDM_VTON"
-    ]
-    
-    last_error = None
-    hf_token = os.getenv("HF_TOKEN", "")
-    
-    for space_id in spaces:
-        try:
-            print(f"[IDM-VTON] Attempting try-on with space: {space_id}")
-            client = Client(space_id, hf_token=hf_token)
-            result = client.predict(
-                dict={"background": handle_file(person_path), "layers": [], "composite": None},
-                garm_img=handle_file(garment_path),
-                garment_des="fashion item",
-                is_checked=True,
-                is_checked_crop=False,
-                denoise_steps=30,
-                seed=42,
-                api_name="/tryon"
-            )
-            # result[0] is the path to the result image
-            return result[0]
-        except Exception as e:
-            last_error = e
-            print(f"[IDM-VTON] Space {space_id} failed: {e}")
-            continue
-    
-    raise Exception(f"All IDM-VTON spaces failed. Last error: {last_error}")
-
-def download_garment_image(image_url):
-    """Downloads garment image to local for IDM-VTON."""
     try:
-        resp = requests.get(image_url, timeout=15)
-        resp.raise_for_status()
-        
-        # Determine extension
-        ext = '.jpg'
-        content_type = resp.headers.get('Content-Type', '').lower()
-        if 'png' in content_type: ext = '.png'
-        elif 'webp' in content_type: ext = '.webp'
-        
-        upload_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        filename = f"garment_{uuid.uuid4().hex}{ext}"
-        path = os.path.join(upload_dir, filename)
-        
-        with open(path, 'wb') as f:
-            f.write(resp.content)
-        return path
-    except Exception as e:
-        print(f"[IDM-VTON] Failed to download garment: {e}")
-        return None
+        from gradio_client import Client, handle_file
+    except ImportError:
+        print("[IDM-VTON] gradio_client not installed -> fallback")
+        return _make_fallback(person_path), True
+
+    spaces = [
+        "yisol/IDM-VTON",
+        "freddyaboulton/IDM-VTON",
+        "adi1516/IDM_VTON",
+    ]
+
+    hf_token = os.getenv("HF_TOKEN", "")
+    results_dir = os.path.join(current_app.static_folder, "static", "tryon_results")
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Try common api names; spaces sometimes change endpoints.
+    api_names = ["/tryon", "/run/predict", None]
+
+    for space_id in spaces:
+        for api_name in api_names:
+            try:
+                print(f"[IDM-VTON] Trying {space_id} (api_name={api_name})...")
+                _wake_space(space_id)
+
+                # gradio_client expects `hf_token` (older code used `token`)
+                client = Client(space_id, hf_token=hf_token) if hf_token else Client(space_id)
+
+                if api_name:
+                    result = client.predict(
+                        dict={"background": handle_file(person_path), "layers": [], "composite": None},
+                        garm_img=handle_file(garment_path),
+                        garment_des="",
+                        is_checked=True,
+                        is_checked_crop=False,
+                        denoise_steps=30,
+                        seed=42,
+                        api_name=api_name,
+                    )
+                else:
+                    result = client.predict(
+                        dict={"background": handle_file(person_path), "layers": [], "composite": None},
+                        garm_img=handle_file(garment_path),
+                        garment_des="",
+                        is_checked=True,
+                        is_checked_crop=False,
+                        denoise_steps=30,
+                        seed=42,
+                    )
+
+                result_raw = result[0] if isinstance(result, (list, tuple)) else result
+                if isinstance(result_raw, dict):
+                    result_raw = (
+                        result_raw.get("url")
+                        or result_raw.get("path")
+                        or result_raw.get("value")
+                        or str(result_raw)
+                    )
+
+                ext = os.path.splitext(str(result_raw))[1] or ".jpg"
+                out_name = f"result_{uuid.uuid4().hex}{ext}"
+                out_path = os.path.join(results_dir, out_name)
+                shutil.copy(str(result_raw), out_path)
+
+                print(f"[IDM-VTON] SUCCESS {space_id} -> {out_path}")
+                return out_path, False
+
+            except Exception as e:
+                print(f"[IDM-VTON] FAIL {space_id} (api_name={api_name}): {type(e).__name__}: {str(e)[:200]}")
+                time.sleep(2)
+                continue
+
+    print("[IDM-VTON] All spaces failed -> fallback")
+    return _make_fallback(person_path), True
+
+def download_garment_image(image_url: str, shopee_url: str):
+    """
+    Download ảnh garment về local. Thử image_url trước, nếu lỗi thử shopee_url.
+    Trả về đường dẫn file local, hoặc None nếu hoàn toàn thất bại.
+    """
+    save_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    os.makedirs(save_dir, exist_ok=True)
+
+    urls_to_try = []
+    if image_url and image_url.startswith("http"):
+        urls_to_try.append(image_url)
+    if shopee_url and shopee_url.startswith("http"):
+        # Shopee thường có ảnh thumbnail trong URL
+        urls_to_try.append(shopee_url)
+
+    for url in urls_to_try:
+        try:
+            resp = _req.get(url, timeout=12, headers=headers, allow_redirects=True)
+            ct   = resp.headers.get("Content-Type", "")
+            if resp.status_code == 200 and len(resp.content) > 5000 and "image" in ct:
+                # Xác định extension
+                ext = ".jpg"
+                if "png" in ct:  ext = ".png"
+                if "webp" in ct: ext = ".webp"
+                filename = f"garment_{uuid.uuid4().hex}{ext}"
+                path = os.path.join(save_dir, filename)
+                
+                content_to_save = resp.content
+                
+                # Check if image has a person (requires cleaning)
+                try:
+                    people, err = extract_keypoints(resp.content)
+                    if not err and len(people) > 0:
+                        print(f"[Garment] Person detected in garment image. Cleaning...")
+                        clean_bytes, _ = remove_background_rgba(resp.content)
+                        if clean_bytes:
+                            content_to_save = clean_bytes
+                            # Update extension to .png for clean image
+                            ext = ".png"
+                            filename = f"garment_clean_{uuid.uuid4().hex}{ext}"
+                            path = os.path.join(save_dir, filename)
+                except Exception as ce:
+                    print(f"[Garment] Cleaning failed: {ce}")
+
+                with open(path, "wb") as f:
+                    f.write(content_to_save)
+                
+                print(f"[Garment] Saved: {len(content_to_save)//1024}KB -> {path}")
+                return path
+            else:
+                print(f"[Garment] Bad response: HTTP={resp.status_code} | size={len(resp.content)} | {url[:60]}")
+        except Exception as e:
+            print(f"[Garment] Failed: {type(e).__name__}: {str(e)[:80]} | {url[:60]}")
+            continue
+
+    print("[Garment] All URLs failed -> cannot get garment image")
+    return None
 
 def _is_allowed_image_file(file_storage) -> bool:
     try:
@@ -225,7 +438,53 @@ def get_recommended_outfits(
     except Exception:
         pass
 
-def get_recommended_outfits(gender, occasion, style, body_shape, budget, limit=6):
+def _get_demo_products():
+    return [
+        {
+            "id": 1,
+            "name": "Áo Sơ Mi Trắng Korean",
+            "price": 185000,
+            "image_url": "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=400&q=80",
+            "shopee_url": "https://shopee.vn/search?keyword=ao+so+mi+trang+korean"
+        },
+        {
+            "id": 2,
+            "name": "Quần Baggy Beige",
+            "price": 249000,
+            "image_url": "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=400&q=80",
+            "shopee_url": "https://shopee.vn/search?keyword=quan+baggy+beige"
+        },
+        {
+            "id": 3,
+            "name": "Đầm Midi Floral",
+            "price": 320000,
+            "image_url": "https://images.unsplash.com/photo-1612722432474-b971cdcea546?w=400&q=80",
+            "shopee_url": "https://shopee.vn/search?keyword=dam+midi+floral"
+        },
+        {
+            "id": 4,
+            "name": "Set Crop Top + Chân Váy",
+            "price": 275000,
+            "image_url": "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80",
+            "shopee_url": "https://shopee.vn/search?keyword=set+crop+top+chan+vay"
+        },
+        {
+            "id": 5,
+            "name": "Áo Thun Basic Tee",
+            "price": 120000,
+            "image_url": "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80",
+            "shopee_url": "https://shopee.vn/search?keyword=ao+thun+basic"
+        },
+        {
+            "id": 6,
+            "name": "Áo Khoác Denim",
+            "price": 380000,
+            "image_url": "https://images.unsplash.com/photo-1544441893-675973e31985?w=400&q=80",
+            "shopee_url": "https://shopee.vn/search?keyword=ao+khoac+denim"
+        },
+    ]
+
+def get_recommended_outfits(gender, occasion, style, body_shape, budget, garment_type="any", limit=6):
     """
     Fetch products from database based on filters.
     """
@@ -244,6 +503,24 @@ def get_recommended_outfits(gender, occasion, style, body_shape, budget, limit=6
         # Style filter
         if style and style.lower() != 'any':
              query = query.filter((Product.style_tag == style) | (Product.style_label == style))
+
+        # Garment type filter
+        if garment_type and str(garment_type).lower() != "any":
+             gt = str(garment_type).lower()
+             if gt == "full outfit":
+                  # Fetch both tops and bottoms
+                  query = query.filter(
+                      (Product.category_label.ilike("top%")) | 
+                      (Product.category_label.ilike("bottom%")) | 
+                      (Product.sub_category_label.ilike("ao%")) | 
+                      (Product.sub_category_label.ilike("quan%"))
+                  )
+             else:
+                  if hasattr(Product, "garment_type"):
+                       query = query.filter(Product.garment_type.ilike(f"{gt}%"))
+                  else:
+                       # fallback to denormalized labels
+                       query = query.filter((Product.category_label.ilike(gt)) | (Product.sub_category_label.ilike(f"{gt}%")))
              
         # Budget filter
         if budget and budget.lower() != 'any':
@@ -261,33 +538,38 @@ def get_recommended_outfits(gender, occasion, style, body_shape, budget, limit=6
         products = query.order_by(func.random()).limit(limit).all()
         
         if not products:
-             # Fallback: get any products if filter is too strict
+             # Fallback: get any products if filter is too strict (never return empty)
              products = Product.query.order_by(func.random()).limit(limit).all()
+             if not products:
+                  return _get_demo_products()
 
         results = []
         for p in products:
+            it_name = p.item_type.name if getattr(p, "item_type", None) else (p.category_label or "")
+            cat_name = p.category.name if getattr(p, "category", None) else (p.sub_category_label or "")
+            garment = getattr(p, "garment_type", None) if hasattr(p, "garment_type") else None
+            if not garment:
+                it_low = str(it_name or "").lower()
+                cat_low = str(cat_name or "").lower()
+                if it_low in ("tops", "bottoms") and cat_low:
+                    garment = f"{it_low} ({cat_low})"
+                elif it_low:
+                    garment = it_low
             results.append({
                 'id': p.id,
                 'name': p.name,
                 'price': p.price,
                 'image_url': p.image_url,
-                'shopee_url': getattr(p, "shopee_url", None) or p.product_url or f"https://shopee.vn/search?keyword={p.name}"
+                'shopee_url': getattr(p, "shopee_url", None) or p.product_url or f"https://shopee.vn/search?keyword={p.name}",
+                'garment_type': garment,
+                'gender': (p.gender or "unisex").lower()
             })
         return results
     except Exception as e:
         print(f"[DB] Recommend error: {e}")
-        return []
+        return _get_demo_products()
 
-def extract_keypoints(*args, **kwargs): return [], None
-def compute_ratios(*args, **kwargs): return {}
-def estimate_gender(*args, **kwargs): return "Unisex"
-def predict_shape(*args, **kwargs): return "Rectangle"
-def predict_shape_with_confidence(*args, **kwargs): return "Rectangle", 0.5
-def remove_background_rgba(*args, **kwargs): return None
-def recolor_clothing(*args, **kwargs): return None
-def upscale_image(*args, **kwargs): return None
-def change_background(*args, **kwargs): return None
-def detect_clothing_color(*args, **kwargs): return "Multicolor", "Pattern"
+# Removed dummy AI functions - now imported from .ai package
 
 def is_single_item_image(image_bytes: bytes) -> bool:
     """
@@ -415,28 +697,53 @@ def map_to_canonical_clothing(ai_category: str, item_type_raw: str, shopee_cat: 
 def infer_canonical_category_by_name(name: str) -> tuple[str, str]:
     n = _norm_ascii(name)
     # Heuristic keywords
-    if any(k in n for k in ["croptop", "crop top", "crop", "ao ho eo", "baby tee"]):
-        return "tops", "crop_top"
-    if any(k in n for k in ["tshirt", "t-shirt", "tee", "ao thun", "ao phong"]):
-        return "tops", "t_shirt"
-    if "so mi" in n or "shirt" in n:
-        return "tops", "shirt"
-    if any(k in n for k in ["hoodie", "sweater", "ao len", "cardigan"]):
-        return "tops", "sweater"
-    if any(k in n for k in ["khoac", "jacket", "blazer", "coat"]):
-        return "tops", "jacket"
     if any(k in n for k in ["chan vay", "skirt", "vay"]):
         return "dresses_skirts", "skirt"
-    if any(k in n for k in ["dam", "dress", "vay lien"]):
+    if any(k in n for k in ["dam ", " dress", "vay lien"]):
         return "dresses_skirts", "dress"
     if any(k in n for k in ["jean", "denim"]):
         return "bottoms", "jeans"
-    if any(k in n for k in ["quan tay", "trouser", "quan au"]):
+    if any(k in n for k in ["quan tay", "trouser", "quan au", "quan dai", "quan baggy", "quan ong suong", "quan jogger"]):
         return "bottoms", "trousers"
     if any(k in n for k in ["short", "quan dui", "shorts"]):
         return "bottoms", "shorts"
+    if "quan" in n:
+        return "bottoms", "trousers"
+
+    if any(k in n for k in ["croptop", "crop top", "crop", "ao ho eo", "baby tee"]):
+        return "tops", "crop_top"
+    if any(k in n for k in ["tshirt", "t-shirt", "tee", "ao thun", "ao phong", "ao canh"]):
+        return "tops", "t_shirt"
+    if "so mi" in n or "shirt" in n or "ao kieu" in n:
+        return "tops", "shirt"
+    if any(k in n for k in ["hoodie", "sweater", "ao len", "cardigan"]):
+        return "tops", "sweater"
+    if any(k in n for k in ["khoac", "jacket", "blazer", "coat", "gi le"]):
+        return "tops", "jacket"
+    
     # Default safe
     return "tops", "t_shirt"
+
+def validate_and_fix_category(name: str, category: str, sub_category: str = "") -> tuple[str, str]:
+    """
+    Enforces category consistency. If 'quần' is in the name, it must be bottoms.
+    """
+    n = _norm_ascii(name)
+    c = str(category or "").lower()
+    
+    # Bottoms enforcement
+    BOTTOMS_KEYWORDS = ["quan", "jean", "denim", "trouser", "short", "skirt", "chan vay"]
+    if any(k in n for k in BOTTOMS_KEYWORDS):
+        if not c.startswith("bottoms") and "dresses_skirts" not in c:
+            return infer_canonical_category_by_name(name)
+            
+    # Dress enforcement
+    DRESS_KEYWORDS = ["dam", "vay lien", "jumpsuit"]
+    if any(k in n for k in DRESS_KEYWORDS):
+        if c != "dresses_skirts" and c != "one-piece":
+            return infer_canonical_category_by_name(name)
+            
+    return category, sub_category
 
 def _norm_text(s: str, max_len: int | None = None) -> str:
     t = (s or "").strip()
@@ -1861,9 +2168,11 @@ def save_crawled_products_preview():
                 item_type_name, category_name = infer_canonical_category_by_name(item.get('name') or '')
 
             # Không còn bỏ qua vì category là bắt buộc: nếu giá trị rơi vào Other → gán về mặc định tops/t_shirt
-            vn_cat = str(category_name or '').strip().lower()
             if vn_cat in ('', 'other', 'khac', 'khác', 'phan loai khac', 'phân loại khác'):
                 item_type_name, category_name = 'tops', 't_shirt'
+
+            # Final validation before saving
+            item_type_name, category_name = validate_and_fix_category(product.name, item_type_name, category_name)
 
             color_name = _norm["color_name"]
             color_tone = _norm["color_tone"]
@@ -2040,6 +2349,8 @@ def products():
         color_tone = _norm["color_tone"]
         season_name = _norm["season_name"]
         occasion_name = _norm["occasion_name"]
+
+        item_type_name, sub_category_name = validate_and_fix_category(product.name, item_type_name, sub_category_name)
 
         product.category_label = item_type_name[:50]
         product.sub_category_label = sub_category_name[:50]
@@ -2417,7 +2728,9 @@ def product_detail(id):
                 item_type_name, sub_category_name = [part.strip() for part in category_field.split('|', 1)]
             else:
                 item_type_name = str(category_field).strip() if category_field else (product.item_type.name if product.item_type else product.category_label or 'Other')
-                sub_category_name = sub_category_name or product.category.name if product.category else product.sub_category_label or 'Other'
+                sub_category_name = sub_category_name or (product.category.name if product.category else product.sub_category_label or 'Other')
+
+            item_type_name, sub_category_name = validate_and_fix_category(product.name, item_type_name, sub_category_name)
 
             item_type = get_or_create(ItemType, name=item_type_name)
             category = get_or_create(Category, name=sub_category_name, defaults={'item_type': item_type})
@@ -2543,6 +2856,7 @@ def virtual_tryon_api():
         style = (request.form.get('style') or 'any').strip()
         body_shape = (request.form.get('body_shape') or '').strip()
         budget = (request.form.get('budget') or 'any').strip()
+        garment_type = (request.form.get('garment_type') or 'any').strip()
 
         # Folders
         upload_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
@@ -2555,6 +2869,9 @@ def virtual_tryon_api():
         in_name = f"{uuid.uuid4().hex}{ext}"
         in_path = os.path.join(upload_dir, in_name)
         photo.save(in_path)
+        print(f"[DEBUG] person_path = {in_path}")
+        print(f"[DEBUG] person_path exists = {os.path.exists(in_path)}")
+        print(f"[DEBUG] person_path size = {os.path.getsize(in_path)} bytes")
 
         # 1. Get filtered outfits
         recommended = get_recommended_outfits(
@@ -2563,38 +2880,150 @@ def virtual_tryon_api():
             style=style,
             body_shape=body_shape,
             budget=budget,
+            garment_type=garment_type,
             limit=6,
         )
 
         if not recommended:
-             return jsonify({'success': False, 'message': 'No suitable items found in database for this selection.'}), 404
+             # Never return empty per spec
+             recommended = _get_demo_products()
 
-        # 2. Get the best match (first item) garment image
-        best_match = recommended[0]
+        # 2. Pick garment image (priority: match garment_type -> http image -> first item)
+        candidates = recommended
+        if garment_type and garment_type.lower() != "any":
+            gt = garment_type.lower()
+            matched = [x for x in candidates if str(x.get("garment_type") or "").lower().startswith(gt)]
+            if matched:
+                candidates = matched
+
+        best_match = next((x for x in candidates if str(x.get('image_url') or '').startswith('http')), None) or candidates[0]
         garment_url = best_match.get('image_url')
+        shopee_url = best_match.get('shopee_url')
+        print(f"[DEBUG] garment_url from DB = {garment_url}")
+        print(f"[DEBUG] shopee_url from DB = {shopee_url}")
         
         if not garment_url:
-             return jsonify({'success': False, 'message': 'Best match item is missing an image.'}), 400
+             # If we can't get garment image, fallback to original person photo (still success)
+             garment_url = None
              
-        garment_path = download_garment_image(garment_url)
-        if not garment_path:
-             return jsonify({'success': False, 'message': 'Failed to download clothing image from Shopee.'}), 500
+        garment_path = download_garment_image(garment_url, shopee_url) if garment_url else None
+        if garment_path:
+            print(f"[DEBUG] garment_local_path = {garment_path}")
+            print(f"[DEBUG] garment exists = {os.path.exists(garment_path)}")
+            print(f"[DEBUG] garment size = {os.path.getsize(garment_path)} bytes")
 
         # 3. Call AI Try-On
-        out_name = f"result_{uuid.uuid4().hex}.jpg"
+        import hashlib
+        def _get_file_hash(path):
+            with open(path, "rb") as f:
+                return hashlib.md5(f.read()).hexdigest()
+
+        # Rule 3: Cache đúng (user_image + product_id + category)
+        person_hash = _get_file_hash(in_path)
+        garment_id = best_match.get("id", "none")
+        cache_key = hashlib.md5(f"{person_hash}_{garment_id}_{garment_type}".encode()).hexdigest()
+        
+        out_name = f"cache_{cache_key}.jpg"
         out_path = os.path.join(results_dir, out_name)
 
+        # Check if cache exists
+        if os.path.exists(out_path):
+            print(f"[TRYON] Cache hit! Returning existing result for key: {cache_key}")
+            return jsonify({
+                "success": True,
+                "result_image_url": f"/static/tryon_results/{out_name}",
+                "is_fallback": False,
+                "tried_outfit": {
+                    "id": best_match.get("id"),
+                    "name": best_match.get("name"),
+                    "price": best_match.get("price"),
+                    "image_url": best_match.get("image_url"),
+                    "shopee_url": best_match.get("shopee_url"),
+                    "category": best_match.get("category")
+                },
+                "recommended_outfits": recommended
+            }), 200
+
+        is_fallback = True
+        final_path = in_path
+
         try:
-            temp_result_path = call_idm_vton(in_path, garment_path)
-            # Copy result to stable folder
-            shutil.copyfile(temp_result_path, out_path)
+            # Determine Rendering Flow (Single vs 2-Step)
+            if garment_type.lower() == "full outfit":
+                print("[TRYON] Full Outfit detected. Starting 2-step process...")
+                
+                # Step 1: Find a TOP (Robust detection)
+                top_item = next((x for x in recommended if any(k in str(x.get("garment_type") or "").lower() for k in ["top", "ao", "áo", "shirt", "t-shirt", "vest", "khoác"])), None)
+                # Step 2: Find a BOTTOM (Robust detection)
+                bottom_item = next((x for x in recommended if any(k in str(x.get("garment_type") or "").lower() for k in ["bottom", "quan", "quần", "pants", "short", "jeans", "trouser"])), None)
+                
+                current_person_path = in_path
+                
+                # Render Top
+                if top_item:
+                    print(f"[TRYON] Step 1: Applying TOP {top_item['name']}")
+                    t_garment = download_garment_image(top_item['image_url'], top_item.get('shopee_url'))
+                    if t_garment:
+                        res_top, fb_top = call_fashn_vton(current_person_path, t_garment, category="tops")
+                        if not fb_top:
+                            current_person_path = res_top
+                            is_fallback = False
+                
+                # Render Bottom
+                if bottom_item:
+                    print(f"[TRYON] Step 2: Applying BOTTOM {bottom_item['name']}")
+                    b_garment = download_garment_image(bottom_item['image_url'], bottom_item.get('shopee_url'))
+                    if b_garment:
+                        res_bottom, fb_bottom = call_fashn_vton(current_person_path, b_garment, category="bottoms")
+                        if not fb_bottom:
+                            final_path = res_bottom
+                            is_fallback = False
+                        else:
+                            final_path = current_person_path # Keep top only if bottom fails
+                else:
+                    final_path = current_person_path
+
+            else:
+                # Single Item Try-On (Default)
+                cat = "tops"
+                if "bottom" in garment_type.lower(): cat = "bottoms"
+                if "dress" in garment_type.lower() or "vay" in garment_type.lower(): cat = "one-pieces"
+                
+                res_path, fb = call_fashn_vton(in_path, garment_path, category=cat) if garment_path else (in_path, True)
+                
+                # If FASHN failed, try IDM-VTON immediately
+                if fb and garment_path:
+                    print("[TRYON] FASHN VTON failed. Trying IDM-VTON...")
+                    res_path, fb = call_idm_vton(in_path, garment_path)
+
+                # FIX BUG 1: Similarity Check -> Re-run with IDM-VTON as fallback if FASHN didn't change anything
+                if not fb:
+                    sim = _get_image_similarity(in_path, res_path)
+                    print(f"[TRYON] Output similarity: {sim:.2%}")
+                    if sim > 0.85:
+                        print("[TRYON] Image didn't change enough (>85% similar). Trying IDM-VTON fallback...")
+                        res_path, fb = call_idm_vton(in_path, garment_path)
+
+            # Copy to final out_path
+            shutil.copyfile(final_path, out_path)
+            
         except Exception as ai_err:
-            print(f"[IDM-VTON] AI Try-On failed: {ai_err}")
-            return jsonify({'success': False, 'message': f'AI Service is busy or failed: {str(ai_err)}'}), 503
+            print(f"[TRYON] Critical Failure: {ai_err}")
+            shutil.copyfile(in_path, out_path)
+            is_fallback = True
 
         return jsonify({
             "success": True,
-            "result_image_url": f"/static/tryon_results/{out_name}",
+            "result_image_url": f"/static/tryon_results/{os.path.basename(out_path)}",
+            "is_fallback": is_fallback,
+            "tried_outfit": {
+                "id": best_match.get("id"),
+                "name": best_match.get("name"),
+                "price": best_match.get("price"),
+                "image_url": best_match.get("image_url"),
+                "shopee_url": best_match.get("shopee_url"),
+                "category": best_match.get("category")
+            },
             "recommended_outfits": recommended
         }), 200
 

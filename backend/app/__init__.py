@@ -1,6 +1,7 @@
 import os
 import sys
 
+from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -52,12 +53,26 @@ def _ensure_tryon_schema(db_path: str) -> None:
                 # Ignore: if table is locked or SQLite rejects an alter due to constraints
                 pass
 
-        add_col_if_missing("ALTER TABLE products ADD COLUMN shopee_url TEXT;", "shopee_url")
-        add_col_if_missing("ALTER TABLE products ADD COLUMN gender TEXT DEFAULT 'female';", "gender")
-        add_col_if_missing("ALTER TABLE products ADD COLUMN occasion TEXT DEFAULT 'casual';", "occasion")
-        add_col_if_missing("ALTER TABLE products ADD COLUMN style_tag TEXT;", "style_tag")
-        add_col_if_missing("ALTER TABLE products ADD COLUMN body_shape_tag TEXT;", "body_shape_tag")
-        add_col_if_missing("ALTER TABLE products ADD COLUMN image_url TEXT;", "image_url")
+        # --- MIGRATION: thêm cột mới vào products nếu chưa có ---
+        _migration_columns = [
+            ("shopee_url",      "TEXT DEFAULT ''"),
+            ("image_url",       "TEXT DEFAULT ''"),
+            ("gender",          "TEXT DEFAULT 'female'"),
+            ("occasion",        "TEXT DEFAULT 'casual'"),
+            ("style_tag",       "TEXT DEFAULT ''"),
+            ("body_shape_tag",  "TEXT DEFAULT ''"),
+            ("garment_type",    "TEXT DEFAULT ''"),
+            ("has_model",       "INTEGER DEFAULT 0"),
+        ]
+        for col_name, col_def in _migration_columns:
+            if col_name not in existing_cols:
+                try:
+                    cur.execute(f"ALTER TABLE products ADD COLUMN {col_name} {col_def}")
+                    conn.commit()
+                    print(f"[Migration] Added column: {col_name}")
+                except Exception:
+                    pass # cột đã tồn tại, bỏ qua hoàn toàn
+        # --- END MIGRATION ---
 
         conn.commit()
         conn.close()
@@ -67,6 +82,9 @@ def _ensure_tryon_schema(db_path: str) -> None:
 
 
 def create_app():
+    # Load env vars from project root `.env` (e.g. HF_TOKEN=...)
+    load_dotenv()
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
     frontend_dir = os.path.join(base_dir, "..", "..", "frontend")
     frontend_dir = os.path.abspath(frontend_dir)

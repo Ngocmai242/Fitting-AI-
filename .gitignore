@@ -37,4 +37,6 @@ git_error*.txt
 output.log
 final_output.log
 debug_output.log
-debug_shopee*.py
+# Result Caches
+frontend/static/tryon_results/*
+!frontend/static/tryon_results/.gitkeep

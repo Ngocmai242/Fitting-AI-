@@ -93,6 +93,7 @@ class Product(db.Model):
     shopee_url = db.Column(db.Text)
     style_tag = db.Column(db.Text)
     body_shape_tag = db.Column(db.Text)
+    garment_type = db.Column(db.Text)
     price = db.Column(db.Integer)
     price_display = db.Column(db.String(50))
     details = db.Column(db.String(200))
@@ -140,6 +141,8 @@ class Product(db.Model):
     style_ref = db.relationship("Style", back_populates="products")
     season_ref = db.relationship("Season", back_populates="products")
     occasion_ref = db.relationship("Occasion", back_populates="products")
+
+    has_model = db.Column(db.Boolean, default=False)
 
 
 class Outfit(db.Model):

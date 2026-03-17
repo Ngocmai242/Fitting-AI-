@@ -173,6 +173,9 @@ def call_fashn_vton(person_path, garment_path, category="tops"):
         print(f"[FASHN-VTON] FAIL after retries: {e}")
         return person_path, True
 
+    except Exception:
+        return 0.0
+
 def _get_image_similarity(path1, path2):
     """Simple check if two images are the same (pixel-wise or hash)"""
     try:
@@ -188,6 +191,36 @@ def _get_image_similarity(path1, path2):
         return 1.0 - diff
     except Exception:
         return 0.0
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=15),
+    retry=retry_if_exception(is_busy_error),
+    reraise=True
+)
+def call_idm_vton_raw(client, person_path, garment_path, api_name=None):
+    from gradio_client import handle_file
+    if api_name:
+        return client.predict(
+            dict={"background": handle_file(person_path), "layers": [], "composite": None},
+            garm_img=handle_file(garment_path),
+            garment_des="",
+            is_checked=True,
+            is_checked_crop=False,
+            denoise_steps=30,
+            seed=42,
+            api_name=api_name,
+        )
+    else:
+        return client.predict(
+            dict={"background": handle_file(person_path), "layers": [], "composite": None},
+            garm_img=handle_file(garment_path),
+            garment_des="",
+            is_checked=True,
+            is_checked_crop=False,
+            denoise_steps=30,
+            seed=42,
+        )
 
 def call_idm_vton(person_path, garment_path):
     """
@@ -222,27 +255,7 @@ def call_idm_vton(person_path, garment_path):
                 # gradio_client expects `hf_token` (older code used `token`)
                 client = Client(space_id, hf_token=hf_token) if hf_token else Client(space_id)
 
-                if api_name:
-                    result = client.predict(
-                        dict={"background": handle_file(person_path), "layers": [], "composite": None},
-                        garm_img=handle_file(garment_path),
-                        garment_des="",
-                        is_checked=True,
-                        is_checked_crop=False,
-                        denoise_steps=30,
-                        seed=42,
-                        api_name=api_name,
-                    )
-                else:
-                    result = client.predict(
-                        dict={"background": handle_file(person_path), "layers": [], "composite": None},
-                        garm_img=handle_file(garment_path),
-                        garment_des="",
-                        is_checked=True,
-                        is_checked_crop=False,
-                        denoise_steps=30,
-                        seed=42,
-                    )
+                result = call_idm_vton_raw(client, person_path, garment_path, api_name=api_name)
 
                 result_raw = result[0] if isinstance(result, (list, tuple)) else result
                 if isinstance(result_raw, dict):
@@ -2939,6 +2952,12 @@ def virtual_tryon_api():
                         processed_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon', 'processed')
                         t_garment = process_garment_for_vton(t_garment_raw, processed_dir) or t_garment_raw
                         res_top, fb_top = call_fashn_vton(current_person_path, t_garment, category="tops")
+                        
+                        # Fallback for Top
+                        if fb_top or _get_image_similarity(current_person_path, res_top) > 0.85:
+                            print("[TRYON] Top render failed or unchanged. Trying IDM-VTON for top...")
+                            res_top, fb_top = call_idm_vton(current_person_path, t_garment)
+                        
                         if not fb_top:
                             current_person_path = res_top
                             is_fallback = False
@@ -2951,6 +2970,12 @@ def virtual_tryon_api():
                         processed_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon', 'processed')
                         b_garment = process_garment_for_vton(b_garment_raw, processed_dir) or b_garment_raw
                         res_bottom, fb_bottom = call_fashn_vton(current_person_path, b_garment, category="bottoms")
+                        
+                        # Fallback for Bottom
+                        if fb_bottom or _get_image_similarity(current_person_path, res_bottom) > 0.85:
+                            print("[TRYON] Bottom render failed or unchanged. Trying IDM-VTON for bottom...")
+                            res_bottom, fb_bottom = call_idm_vton(current_person_path, b_garment)
+
                         if not fb_bottom:
                             final_path = res_bottom
                             is_fallback = False

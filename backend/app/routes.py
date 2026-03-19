@@ -2880,24 +2880,42 @@ def product_detail(id):
             product.name = data['name']
         if 'price' in data:
             product.price = _parse_vnd_price(data['price'])
-        if 'image' in data:
-            product.image_url = data['image']
-            # Re-clean if image changed
-            cleaned = _clean_image_with_yolo(product.image_url, product.item_id)
-            if cleaned:
-                product.clean_image_path = cleaned
-        if 'product_url' in data:
-            product.product_url = data['product_url']
-            try:
-                product.shopee_url = data['product_url']
-            except Exception:
-                pass
+        
+        # Sửa lỗi cập nhật ảnh: Chạy YOLO làm sạch trong luồng riêng để KHÔNG gây lag UI
+        if 'image' in data or 'image_url' in data:
+            new_img = data.get('image') or data.get('image_url')
+            if new_img and new_img != product.image_url:
+                product.image_url = new_img
+                
+                # Chạy dọn dẹp ảnh ngầm (background) để tránh nghẽn thread chính của Flask
+                import threading
+                def clean_bg(img_url, item_id, pid):
+                    with current_app.app_context():
+                        try:
+                            # Cần query lại product trong thread mới
+                            p = Product.query.get(pid)
+                            if p:
+                                cleaned = _clean_image_with_yolo(img_url, item_id)
+                                if cleaned:
+                                    p.clean_image_path = cleaned
+                                    db.session.commit()
+                        except Exception as e:
+                            print(f"[BG YOLO] Failed for item {item_id}: {e}")
+
+                threading.Thread(target=clean_bg, args=(new_img, product.item_id, product.id)).start()
+
+        if 'product_url' in data or 'link' in data:
+            new_link = data.get('product_url') or data.get('link')
+            if new_link:
+                product.product_url = new_link
+                try:
+                    product.shopee_url = new_link
+                except Exception:
+                    pass
+        
         if 'shopee_url' in data:
-            try:
-                product.shopee_url = data['shopee_url']
-            except Exception:
-                pass
-            if not (data.get('product_url') or '').strip():
+            product.shopee_url = data['shopee_url']
+            if not product.product_url:
                 product.product_url = data['shopee_url']
         elif 'shopee_link' in data:
             product.product_url = data['shopee_link']
@@ -3326,7 +3344,7 @@ def get_normalized_selected():
 
 @main_bp.route('/api/admin/normalize-selected/add', methods=['POST'])
 def add_to_normalized_queue():
-    """Thêm các sản phẩm được chọn từ Product List vào hàng đợi chuẩn hóa."""
+    """Thêm hoặc cập nhật các sản phẩm được chọn từ Product List vào hàng đợi chuẩn hóa."""
     from .models import NormalizedProduct, Product
     data = request.get_json()
     product_ids = data.get("product_ids", [])
@@ -3336,18 +3354,25 @@ def add_to_normalized_queue():
         
     added_count = 0
     for pid in product_ids:
-        # Kiểm tra xem đã tồn tại trong hàng đợi chưa
+        # Nếu đã tồn tại, chúng ta reset lại trạng thái thay vì bỏ qua
         existing = NormalizedProduct.query.filter_by(product_id=pid).first()
-        if not existing:
-            product = Product.query.get(pid)
-            if product:
-                new_item = NormalizedProduct(
-                    product_id=pid,
-                    original_image_url=product.image_url,
-                    status="pending"
-                )
-                db.session.add(new_item)
-                added_count += 1
+        product = Product.query.get(pid)
+        if not product:
+            continue
+
+        if existing:
+            # Reset trạng thái về pending để người dùng có thể chuẩn hóa lại
+            existing.status = "pending"
+            existing.original_image_url = product.image_url
+            added_count += 1
+        else:
+            new_item = NormalizedProduct(
+                product_id=pid,
+                original_image_url=product.image_url,
+                status="pending"
+            )
+            db.session.add(new_item)
+            added_count += 1
                 
     db.session.commit()
     return jsonify({"success": True, "added": added_count})
@@ -3374,21 +3399,17 @@ def run_normalization_selected():
 
     for item_id in ids:
         normalization_queue.put(item_id)
-
-    return jsonify({"success": True, "message": f"Started normalization for {len(ids)} items."})
+        
+    return jsonify({
+        "success": True, 
+        "message": f"Started normalization for {len(ids)} items. You can monitor the progress on the button below.",
+        "processed": 0,
+        "total": len(ids)
+    })
 
 @main_bp.route('/api/admin/normalize-selected/status', methods=['GET'])
 def get_normalization_status():
     """Lấy trạng thái hiện tại của quá trình chuẩn hóa."""
-    # Nếu tác vụ đang chạy nhưng hàng đợi trống, có nghĩa là nó đã hoàn thành
-    if normalization_status["is_running"] and normalization_queue.empty():
-        # Kiểm tra thêm một chút thời gian để đảm bảo worker cuối cùng đã xong
-        import time
-        time.sleep(0.5)
-        if normalization_queue.empty():
-            normalization_status["is_running"] = False
-            normalization_status["status"] = "Idle"
-        
     return jsonify(normalization_status)
 
 @main_bp.route('/api/admin/normalize-selected/delete', methods=['POST'])

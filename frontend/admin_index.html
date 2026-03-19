@@ -245,18 +245,19 @@
         /* Modal Styles */
         .modal-overlay {
             position: fixed;
-            top: 0;
+            top: var(--nav-height); /* Bắt đầu từ dưới thanh Navigation */
             left: 0;
             width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            height: calc(100vh - var(--nav-height)); /* Chỉ chiếm phần diện tích còn lại */
+            background: rgba(0, 0, 0, 0.4);
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: center; /* Căn giữa theo chiều dọc trong phần diện tích còn lại */
             z-index: 1000;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
+            backdrop-filter: blur(2px);
         }
 
         .modal-overlay.active {
@@ -266,13 +267,45 @@
 
         .modal-content {
             background: white;
-            padding: 2rem;
+            padding: 0;
             border-radius: 12px;
             width: 90%;
             max-width: 500px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             transform: translateY(20px);
             transition: transform 0.3s ease;
+            max-height: 90%; /* Chiếm phần lớn diện tích nhưng chừa ra 1 đoạn ngắn trên/dưới */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            background: #fff;
+            flex-shrink: 0;
+        }
+
+        .modal-body {
+            padding: 1.25rem 1.5rem;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #eee;
+            background: #f9fafb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .btn-loading {
+            pointer-events: none;
+            opacity: 0.7;
         }
 
         .modal-overlay.active .modal-content {
@@ -662,6 +695,17 @@
             gap: 15px;
             margin-top: 15px;
         }
+        /* Sticky Action Bars */
+        .sticky-actions {
+            position: sticky;
+            top: -2rem; /* Offset for main-admin-content padding */
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(8px);
+            z-index: 900;
+            padding: 15px 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(139, 169, 201, 0.2);
+        }
     </style>
 </head>
 
@@ -803,7 +847,7 @@
 
                 <div class="admin-card">
                     <h3>Product List</h3>
-                    <div style="display: flex; gap: 10px; margin-bottom: 1rem; align-items: center;">
+                    <div class="sticky-actions" style="display: flex; gap: 10px; align-items: center;">
                         <button class="btn btn-secondary" onclick="loadProducts()" style="width: auto;"><i
                                 class="fas fa-sync"></i> Refresh</button>
                         <button class="btn" onclick="deleteSelectedProducts()"
@@ -835,124 +879,121 @@
                 <!-- Edit Product Modal -->
                 <div id="edit-product-modal" class="modal-overlay">
                     <div class="modal-content">
-                        <h3 style="margin-top:0;">Edit Product</h3>
-                        <input type="hidden" id="edit-id">
+                        <div class="modal-header">
+                            <h3 style="margin:0;">Edit Product</h3>
+                        </div>
+                        
+                        <div class="modal-body">
+                            <input type="hidden" id="edit-id">
 
-                        <div class="form-group">
-                            <label>Name</label>
-                            <input type="text" id="edit-name">
-                        </div>
-                        <div class="form-group">
-                            <label>Price</label>
-                            <input type="number" id="edit-price">
-                        </div>
-                        <div class="form-group">
-                            <label>Image URL</label>
-                            <input type="text" id="edit-image">
-                        </div>
-                        <div class="form-group">
-                            <label>Link</label>
-                            <input type="text" id="edit-link">
-                        </div>
-                        <div class="form-group">
-                            <label>Shop Name</label>
-                            <input type="text" id="edit-shop-name">
-                        </div>
-                        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div class="form-group">
-                                <label>Gender</label>
-                                <select id="edit-gender">
-                                    <option value="female">Female</option>
-                                    <option value="male">Male</option>
-                                    <option value="unisex">Unisex</option>
+                                <label>Name</label>
+                                <input type="text" id="edit-name">
+                            </div>
+                            <div class="form-group">
+                                <label>Price</label>
+                                <input type="number" id="edit-price">
+                            </div>
+                            <!-- ... existing form fields ... -->
+                            <div class="form-group">
+                                <label>Image URL</label>
+                                <input type="text" id="edit-image" placeholder="https://cf.shopee.vn/file/...">
+                            </div>
+                            <div class="form-group">
+                                <label>Shopee/Product URL</label>
+                                <input type="text" id="edit-shopee-url" placeholder="https://shopee.vn/...">
+                            </div>
+                            <div class="form-group">
+                                <label>Original Link (Read-only)</label>
+                                <input type="text" id="edit-link" readonly style="background: #f5f5f5;">
+                            </div>
+                            <div class="form-group">
+                                <label>Shop Name</label>
+                                <input type="text" id="edit-shop-name">
+                            </div>
+                            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="form-group">
+                                    <label>Gender</label>
+                                    <select id="edit-gender">
+                                        <option value="female">Female</option>
+                                        <option value="male">Male</option>
+                                        <option value="unisex">Unisex</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Occasion</label>
+                                    <select id="edit-occasion">
+                                        <option value="casual">Casual</option>
+                                        <option value="work">Work</option>
+                                        <option value="party">Party</option>
+                                        <option value="date">Date</option>
+                                        <option value="sport">Sport</option>
+                                        <option value="beach">Beach</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Style Tag</label>
+                                <select id="edit-style">
+                                    <option value="Casual">Casual</option>
+                                    <option value="Office">Office</option>
+                                    <option value="Party">Party</option>
+                                    <option value="Streetwear">Streetwear</option>
+                                    <option value="Vintage">Vintage</option>
+                                    <option value="Minimal">Minimal</option>
+                                    <option value="Sporty">Sporty</option>
+                                    <option value="Elegant">Elegant</option>
+                                    <option value="Y2K">Y2K</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Occasion</label>
-                                <select id="edit-occasion">
-                                    <option value="casual">Casual</option>
-                                    <option value="work">Work</option>
-                                    <option value="party">Party</option>
-                                    <option value="date">Date</option>
-                                    <option value="sport">Sport</option>
-                                    <option value="beach">Beach</option>
+                                <label>Category</label>
+                                <select id="edit-category">
+                                    <option value="Uncategorized">Select...</option>
+                                    <optgroup label="Tops">
+                                        <option value="Tops|T-shirt">T-shirt</option>
+                                        <option value="Tops|Shirt">Shirt</option>
+                                        <option value="Tops|Polo">Polo</option>
+                                        <option value="Tops|Hoodie">Hoodie</option>
+                                        <option value="Tops|Sweater">Sweater</option>
+                                        <option value="Tops|Blazer">Blazer</option>
+                                        <option value="Tops|Jacket">Jacket</option>
+                                        <option value="Tops|Crop top">Crop top</option>
+                                        <option value="Tops|Tank top">Tank top</option>
+                                    </optgroup>
+                                    <optgroup label="Bottoms">
+                                        <option value="Bottoms|Jeans">Jeans</option>
+                                        <option value="Bottoms|Trousers">Trousers</option>
+                                        <option value="Bottoms|Jogger">Jogger</option>
+                                        <option value="Bottoms|Shorts">Shorts</option>
+                                        <option value="Bottoms|Skirt">Skirt</option>
+                                        <option value="Bottoms|Leggings">Leggings</option>
+                                    </optgroup>
+                                    <optgroup label="One-piece">
+                                        <option value="One-piece|Dress">Dress</option>
+                                        <option value="One-piece|Jumpsuit">Jumpsuit</option>
+                                        <option value="One-piece|Set đồ">Set</option>
+                                    </optgroup>
+                                    <optgroup label="Shoes">
+                                        <option value="Shoes|Sneaker">Sneaker</option>
+                                        <option value="Shoes|High heels">High heels</option>
+                                        <option value="Shoes|Boots">Boots</option>
+                                        <option value="Shoes|Sandals">Sandals</option>
+                                        <option value="Shoes|Loafers">Loafers</option>
+                                    </optgroup>
+                                    <optgroup label="Accessories">
+                                        <option value="Accessories|Bag">Bag</option>
+                                        <option value="Accessories|Belt">Belt</option>
+                                        <option value="Accessories|Hat">Hat</option>
+                                        <option value="Accessories|Glasses">Glasses</option>
+                                        <option value="Accessories|Necklace">Necklace</option>
+                                        <option value="Accessories|Jewelry">Jewelry</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Style Tag</label>
-                            <select id="edit-style">
-                                <option value="Casual">Casual</option>
-                                <option value="Office">Office</option>
-                                <option value="Party">Party</option>
-                                <option value="Streetwear">Streetwear</option>
-                                <option value="Vintage">Vintage</option>
-                                <option value="Minimal">Minimal</option>
-                                <option value="Sporty">Sporty</option>
-                                <option value="Elegant">Elegant</option>
-                                <option value="Y2K">Y2K</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Category</label>
-                            <select id="edit-category">
-                                <option value="Uncategorized">Select...</option>
-                                <optgroup label="Tops">
-                                    <option value="Tops|T-shirt">T-shirt</option>
-                                    <option value="Tops|Shirt">Shirt</option>
-                                    <option value="Tops|Polo">Polo</option>
-                                    <option value="Tops|Hoodie">Hoodie</option>
-                                    <option value="Tops|Sweater">Sweater</option>
-                                    <option value="Tops|Blazer">Blazer</option>
-                                    <option value="Tops|Jacket">Jacket</option>
-                                    <option value="Tops|Crop top">Crop top</option>
-                                    <option value="Tops|Tank top">Tank top</option>
-                                </optgroup>
-                                <optgroup label="Bottoms">
-                                    <option value="Bottoms|Jeans">Jeans</option>
-                                    <option value="Bottoms|Trousers">Trousers</option>
-                                    <option value="Bottoms|Jogger">Jogger</option>
-                                    <option value="Bottoms|Shorts">Shorts</option>
-                                    <option value="Bottoms|Skirt">Skirt</option>
-                                    <option value="Bottoms|Leggings">Leggings</option>
-                                </optgroup>
-                                <optgroup label="One-piece">
-                                    <option value="One-piece|Dress">Dress</option>
-                                    <option value="One-piece|Jumpsuit">Jumpsuit</option>
-                                    <option value="One-piece|Set đồ">Set</option>
-                                </optgroup>
-                                <optgroup label="Shoes">
-                                    <option value="Shoes|Sneaker">Sneaker</option>
-                                    <option value="Shoes|High heels">High heels</option>
-                                    <option value="Shoes|Boots">Boots</option>
-                                    <option value="Shoes|Sandals">Sandals</option>
-                                    <option value="Shoes|Loafers">Loafers</option>
-                                </optgroup>
-                                <optgroup label="Accessories">
-                                    <option value="Accessories|Bag">Bag</option>
-                                    <option value="Accessories|Belt">Belt</option>
-                                    <option value="Accessories|Hat">Hat</option>
-                                    <option value="Accessories|Glasses">Glasses</option>
-                                    <option value="Accessories|Necklace">Necklace</option>
-                                    <option value="Accessories|Jewelry">Jewelry</option>
-                                </optgroup>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Style</label>
-                            <select id="edit-style">
-                                <option value="Casual">Casual</option>
-                                <option value="Office">Office</option>
-                                <option value="Party">Party</option>
-                                <option value="Streetwear">Streetwear</option>
-                                <option value="Vintage">Vintage</option>
-                                <option value="Minimal">Minimal</option>
-                                <option value="Sporty">Sporty</option>
-                                <option value="Elegant">Elegant</option>
-                                <option value="Y2K">Y2K</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+
+                        <div class="modal-footer">
                             <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
                             <button class="btn btn-primary" onclick="saveEditedProduct()">Save Changes</button>
                         </div>
@@ -965,7 +1006,7 @@
                 <h2 class="section-title" style="text-align: left;">Normalized Selected</h2>
                 <p style="color: #666; margin-bottom: 1.5rem;">Chuẩn hóa ảnh để tương thích 100% với Fashn VTON 1.5 (Tách nền, Resize, Phân loại).</p>
 
-                <div class="filter-bar">
+                <div class="sticky-actions filter-bar" style="display: flex; gap: 10px; align-items: center;">
                     <select id="norm-filter-status" onchange="loadNormalizedList()">
                         <option value="">All Status</option>
                         <option value="pending">Pending</option>
@@ -1317,7 +1358,7 @@
                 </div>
 
                 <!-- 2. Search & Filter -->
-                <div class="filter-bar">
+                <div class="sticky-actions filter-bar">
                     <input type="text" id="user-search" placeholder="Search by Email, Username, ID..." style="flex: 2;">
                     <select id="filter-role" style="flex: 1;">
                         <option value="all">All</option>
@@ -2120,7 +2161,10 @@
         }
 
         async function addToNormalizedQueue() {
-            const selected = Array.from(document.querySelectorAll('.product-checkbox:checked')).map(cb => parseInt(cb.value));
+            const checkboxes = document.querySelectorAll('.product-checkbox:checked');
+            const selected = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            console.log("Selected IDs to add:", selected);
+            
             if (selected.length === 0) return alert('Please select at least one product.');
             
             try {
@@ -2131,16 +2175,17 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert(data.message || `Successfully added ${data.added} products to Normalized Selected tab.`);
+                    alert(data.message || `Successfully added/updated ${data.added} products in Normalized Selected tab.`);
                     // Uncheck all
-                    document.getElementById('select-all-products').checked = false;
+                    const master = document.getElementById('select-all-products');
+                    if (master) master.checked = false;
                     document.querySelectorAll('.product-checkbox').forEach(cb => cb.checked = false);
                 } else {
                     alert('Error: ' + data.message);
                 }
             } catch (e) {
                 console.error(e);
-                alert('Connection error');
+                alert('Connection error: ' + e.message);
             }
         }
 
@@ -2179,8 +2224,10 @@
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid #eee';
                 
-                const statusClass = item.status === 'processed' ? 'badge-active' : (item.status === 'failed' ? 'badge-blocked' : '');
-                const normImg = item.normalized_image ? `<img src="${item.normalized_image}" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #eee; border-radius: 4px;">` : '<span style="color:#ccc">Pending</span>';
+                const statusClass = item.status === 'processed' ? 'badge-active' : (item.status === 'failed' ? 'badge-blocked' : 'badge-waiting');
+                const normImg = item.status === 'processed' && item.normalized_image 
+                    ? `<img src="${item.normalized_image}" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #eee; border-radius: 4px;">` 
+                    : `<div style="width: 60px; height: 60px; background: #f9fafb; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px dashed #ddd; color: #9ca3af; font-size: 0.7rem; text-align:center;">${item.status === 'processing' ? 'Processing...' : 'Wait AI'}</div>`;
                 
                 tr.innerHTML = `
                     <td style="padding: 15px;"><input type="checkbox" class="norm-checkbox" value="${item.id}"></td>
@@ -2189,8 +2236,16 @@
                     <td style="padding: 15px; font-weight: 500;">${item.product_name}</td>
                     <td style="padding: 15px;"><span class="norm-tag tag-blue">${item.category || 'N/A'}</span></td>
                     <td style="padding: 15px;"><span class="${statusClass}">${item.status.toUpperCase()}</span></td>
-                    <td style="padding: 15px; text-align: center;">
-                        <button class="action-btn" style="color: var(--admin-blue);" onclick="downloadNormalized(${item.id})" ${item.status !== 'processed' ? 'disabled' : ''}><i class="fas fa-download"></i></button>
+                    <td style="padding: 15px; text-align: center; display: flex; gap: 5px; justify-content: center; align-items: center; height: 90px;">
+                        <button class="action-btn" title="Download" style="color: var(--admin-blue);" onclick="downloadNormalized(${item.id})" ${item.status !== 'processed' ? 'disabled' : ''}>
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="action-btn" title="Re-run AI" style="color: #6366f1;" onclick="runSingleNormalization(${item.id})">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                        <button class="action-btn" title="Remove" style="color: #ef4444;" onclick="deleteSingleNormalization(${item.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -2240,22 +2295,67 @@
                     const data = await res.json();
                     
                     if (data.is_running) {
-                        const percentage = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
-                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing... ${percentage}%`;
+                        const processed = data.processed || 0;
+                        const total = data.total || 0;
+                        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+                        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing... ${processed}/${total} (${percentage}%)`;
                     } else {
                         clearInterval(interval);
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-magic"></i> Normalize Selected';
-                        alert('Normalization complete!');
-                        loadNormalizedList();
+                        
+                        // Chờ một chút để đảm bảo item cuối cùng đã được commit vào DB 
+                        // và tránh lỗi race condition khi load danh sách quá nhanh
+                        btn.innerHTML = `<i class="fas fa-check-circle"></i> Finishing...`;
+                        
+                        setTimeout(() => {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-magic"></i> Normalize Selected';
+                            alert('Normalization complete!');
+                            loadNormalizedList();
+                        }, 1000);
                     }
                 } catch (e) {
-                    console.error(e);
+                    console.error('Polling error:', e);
                     clearInterval(interval);
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-magic"></i> Normalize Selected';
                 }
             }, 2000);
+        }
+
+        async function runSingleNormalization(id) {
+            try {
+                const res = await fetch(`${API_URL}/admin/normalize-selected/run`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: [id] })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    pollNormalizationStatus();
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Connection error');
+            }
+        }
+
+        async function deleteSingleNormalization(id) {
+            if (!confirm('Remove this item from normalized queue?')) return;
+            try {
+                const res = await fetch(`${API_URL}/admin/normalize-selected/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: [id] })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadNormalizedList();
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         async function deleteNormalizedSelected() {
@@ -2499,8 +2599,7 @@
             const name = document.getElementById('edit-name').value;
             const price = document.getElementById('edit-price').value;
             const image = document.getElementById('edit-image').value;
-            const link = document.getElementById('edit-link').value;
-            const shopee_url = document.getElementById('edit-shopee-url')?.value || link;
+            const shopee_url = document.getElementById('edit-shopee-url').value;
             const shop_name = document.getElementById('edit-shop-name').value.trim();
             const rawCategory = document.getElementById('edit-category').value;
             const style = document.getElementById('edit-style').value;
@@ -2508,6 +2607,8 @@
             const occasion = document.getElementById('edit-occasion')?.value || 'casual';
             const style_tag = style;
             const body_shape_tag = '';
+
+            console.log("Saving product with image:", image, "and shopee_url:", shopee_url);
 
             let category = "Uncategorized";
             let sub_category = "General";
@@ -2538,7 +2639,15 @@
                 }
             }
 
+            const btnSave = document.querySelector('.modal-footer .btn-primary');
+            const originalBtnHtml = btnSave.innerHTML;
+            
             try {
+                // UI Loading state
+                btnSave.disabled = true;
+                btnSave.classList.add('btn-loading');
+                btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                
                 const res = await fetch(`${window.APP_CONFIG.getApiUrl()}/products/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -2546,6 +2655,7 @@
                         name,
                         price: price,
                         image,
+                        image_url: image, // Use image_url for consistency with backend PUT handler
                         shopee_url,
                         category,
                         sub_category,
@@ -2557,17 +2667,23 @@
                         body_shape_tag
                     })
                 });
-
+ 
                 if (res.ok) {
                     closeEditModal();
+                    alert('✅ Product updated successfully!');
                     loadProducts();
-                    alert('Product updated!');
                 } else {
-                    alert('Failed to update product.');
+                    const err = await res.json();
+                    alert('❌ Failed to update product: ' + (err.message || 'Unknown error'));
                 }
             } catch (e) {
                 console.error(e);
-                alert('Error updating product.');
+                alert('❌ Connection error: ' + e.message);
+            } finally {
+                // Restore Button state
+                btnSave.disabled = false;
+                btnSave.classList.remove('btn-loading');
+                btnSave.innerHTML = originalBtnHtml;
             }
         }
 

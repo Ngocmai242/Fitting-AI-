@@ -78,19 +78,26 @@ def process_single_item(item_id, app):
 
         try:
             # Cập nhật trạng thái bắt đầu xử lý
+            with status_lock:
+                normalization_status["status"] = f"Processing item {item_id}"
+            
             item.status = "processing"
             db.session.commit()
 
             garment_url = item.original_image_url
             shopee_url = item.product.shopee_url if item.product else None
             
+            print(f"[Worker] Processing item {item_id} | URL: {garment_url[:40]}...")
+            
             if not garment_url and not shopee_url:
+                print(f"[Worker] Error: No URL for item {item_id}")
                 item.status = "failed"
                 db.session.commit()
                 return False
 
             local_raw = download_garment_image(garment_url, shopee_url)
             if not local_raw:
+                print(f"[Worker] Error: Download failed for item {item_id}")
                 item.status = "failed"
                 db.session.commit()
                 return False
@@ -99,9 +106,11 @@ def process_single_item(item_id, app):
             os.makedirs(norm_dir, exist_ok=True)
             
             # Xử lý ảnh (RemBG, Inpainting, Resize)
+            print(f"[Worker] Running AI processing for item {item_id}...")
             norm_path = process_garment_for_vton(local_raw, norm_dir)
             
             if norm_path:
+                print(f"[Worker] AI processing successful! Saved to: {norm_path}")
                 item.normalized_image_path = f"/static/normalized_selected/{os.path.basename(norm_path)}"
                 
                 # Phân loại lại dựa trên tên sản phẩm
@@ -117,20 +126,23 @@ def process_single_item(item_id, app):
                 db.session.commit()
                 return True
             else:
+                print(f"[Worker] AI processing failed (no output) for item {item_id}")
                 item.status = "failed"
                 db.session.commit()
                 return False
         except Exception as e:
             app.logger.error(f"Error processing item {item_id}: {e}")
+            print(f"[Worker] EXCEPTION mapping item {item_id}: {e}")
             try:
                 db.session.rollback()
-                # Cố gắng lưu trạng thái failed
                 failed_item = db.session.get(NormalizedProduct, item_id)
                 if failed_item:
                     failed_item.status = "failed"
                     db.session.commit()
-            except:
-                pass
+            except: pass
+            
+            with status_lock:
+                normalization_status["last_error"] = str(e)
             return False
         finally:
             with status_lock:
@@ -154,17 +166,22 @@ def worker_manager(app):
                     items_to_process.append(item_id)
                 
                 if items_to_process:
-                    # Gửi tất cả item vào pool để xử lý song song
-                    executor.map(lambda x: process_single_item(x, app), items_to_process)
+                    # Gửi tất cả item vào pool để xử lý song song và CHỜ đến khi đợt này xong hết mới đi tiếp
+                    # Việc dùng list() ép generator phải thực thi xong các task
+                    print(f"[Worker Manager] Starting batch of {len(items_to_process)} items...")
+                    list(executor.map(lambda x: process_single_item(x, app), items_to_process))
+                    print(f"[Worker Manager] Batch finished.")
                 
                 # Nghỉ một chút trước khi check queue tiếp
                 time.sleep(1)
                 
-                # Tự động reset trạng thái nếu đã xong hết
+                # Tự động reset trạng thái nếu thực sự đã xong hết tất cả các task đã nhận
                 with status_lock:
                     if normalization_queue.empty() and normalization_status["processed"] >= normalization_status["total"]:
-                        normalization_status["is_running"] = False
-                        normalization_status["status"] = "Idle"
+                        if normalization_status["is_running"]:
+                            print(f"[Worker Manager] All tasks completed ({normalization_status['processed']}/{normalization_status['total']}). Going Idle.")
+                            normalization_status["is_running"] = False
+                            normalization_status["status"] = "Idle"
                         
             except Exception as e:
                 print(f"[Worker Manager] Error: {e}")

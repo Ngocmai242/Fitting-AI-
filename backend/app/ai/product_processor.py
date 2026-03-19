@@ -126,6 +126,17 @@ def extract_main_product(input_path, output_path=None, model_name="u2net_cloth_s
                 final_w = target_w + (pad * 2)
                 final_h = int(final_w / 0.75)
 
+            # Đảm bảo độ phân giải tối thiểu 1024px chiều cao để giữ nét
+            if final_h < 1024:
+                scale = 1024 / final_h
+                new_w = int(target_w * scale)
+                new_h = int(target_h * scale)
+                # Dùng LANCZOS để giữ nét tối đa khi phóng to
+                cropped = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                final_h = 1024
+                final_w = int(final_h * 0.75)
+                target_w, target_h = new_w, new_h
+
             canvas = Image.new("RGBA", (final_w, final_h), (0, 0, 0, 0))
             # Dán vào chính giữa
             offset = ((final_w - target_w) // 2, (final_h - target_h) // 2)
@@ -137,11 +148,13 @@ def extract_main_product(input_path, output_path=None, model_name="u2net_cloth_s
         if output_path:
             ext = os.path.splitext(output_path)[1].lower()
             if ext in ['.jpg', '.jpeg']:
+                # Dùng nền trắng cho JPEG, chất lượng tối đa 100
                 background = Image.new("RGB", cropped.size, (255, 255, 255))
                 background.paste(cropped, mask=cropped.split()[3])
-                background.save(output_path, "JPEG", quality=95)
+                background.save(output_path, "JPEG", quality=100, subsampling=0)
             else:
-                cropped.save(output_path, format='PNG')
+                # Dùng PNG lossless, tối ưu hóa dung lượng nhưng giữ nguyên chất lượng
+                cropped.save(output_path, format='PNG', optimize=True)
             return output_path
         else:
             return cropped

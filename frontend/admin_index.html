@@ -698,13 +698,14 @@
         /* Sticky Action Bars */
         .sticky-actions {
             position: sticky;
-            top: -2rem; /* Offset for main-admin-content padding */
+            top: var(--nav-height); /* Stays below the fixed top navigation bar */
             background: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(8px);
             z-index: 900;
             padding: 15px 0;
             margin-bottom: 1.5rem;
             border-bottom: 1px solid rgba(139, 169, 201, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
     </style>
 </head>
@@ -2078,19 +2079,19 @@
                     const priceFormatted = p.price ? p.price.toLocaleString() + ' VND' : '0 VND';
                     const rawImage = p.clean_image_path || p.image || p.image_url || '';
                     let imgSrc = rawImage || 'https://via.placeholder.com/50';
-                    if (rawImage) {
-                        if (rawImage.startsWith('data:') || rawImage.startsWith('blob:')) {
-                            imgSrc = rawImage;
-                        } else if (rawImage.startsWith('/')) {
-                            imgSrc = BACKEND_URL ? (BACKEND_URL + rawImage) : rawImage;
-                        } else if (rawImage.startsWith('http')) {
-                            const blocked = /susercontent\.com|shopee\.vn|lzdcdn\.com|alicdn\.com/i.test(rawImage);
-                            if (blocked && API_URL) {
-                                imgSrc = `${API_URL}/image-proxy?url=${encodeURIComponent(rawImage)}`;
-                            } else {
-                                imgSrc = rawImage;
-                            }
-                        }
+                    
+                    // Multi-image display logic
+                    let imagesHtml = '';
+                    const cleanPathsList = p.clean_image_paths || [];
+                    if (cleanPathsList.length > 1) {
+                         imagesHtml = `<div style="display: flex; gap: 4px; overflow-x: auto; max-width: 120px; padding: 2px;">`;
+                         cleanPathsList.forEach(path => {
+                              const thumbSrc = path.startsWith('/') ? (BACKEND_URL ? (BACKEND_URL + path) : path) : path;
+                              imagesHtml += `<img src="${thumbSrc}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #eee; cursor: pointer;" onclick="window.open('${thumbSrc}', '_blank')" title="View Clean Image">`;
+                         });
+                         imagesHtml += `</div>`;
+                    } else {
+                         imagesHtml = `<img src="${imgSrc}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
                     }
 
                     // Truncate long names for display
@@ -2132,7 +2133,7 @@
                     tr.innerHTML = `
                         <td style="text-align: center;"><input type="checkbox" class="product-checkbox" value="${p.id}"></td>
                         <td style="text-align: center; color: #888;">${p.id}</td>
-                        <td style="text-align: center;"><img src="${imgSrc}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></td>
+                        <td style="text-align: center;">${imagesHtml}</td>
                         <td style="padding-left: 15px; font-weight: 500;" title="${p.name}">${displayName}</td>
                         <td style="text-align: center; color: var(--admin-pink); font-weight: 700;">${priceFormatted}</td>
                         <td style="text-align: center;"><span style="background: #e3f2fd; color: var(--admin-blue); padding: 5px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">${category} ${subCategory}</span></td>
@@ -2140,7 +2141,8 @@
                         <td style="text-align: center;">${normHtml}</td>
                         <td style="text-align: center;">${displayLink}</td>
                         <td style="text-align: center;">
-                            <button class="action-btn" onclick="runNormalization([${p.id}])" title="AI Standardize" style="color: var(--admin-pink);"><i class="fas fa-magic"></i></button>
+                            <button class="action-btn" onclick="removeBackgroundOnly(${p.id}, 'standard', this)" title="Remove BG Only (Flat/Simple)" style="color: #48c774;"><i class="fas fa-eraser"></i></button>
+                            <button class="action-btn" onclick="runNormalization([${p.id}])" title="AI Standardize (Full Pipeline)" style="color: var(--admin-pink);"><i class="fas fa-magic"></i></button>
                             <button class="action-btn" style="color: var(--admin-blue);" onclick="openEditModal(${p.id})"><i class="fas fa-edit"></i></button>
                             <button class="action-btn delete" style="color: #e57373;" onclick="deleteProduct(${p.id})"><i class="fas fa-trash-alt"></i></button>
                         </td>
@@ -2225,9 +2227,23 @@
                 tr.style.borderBottom = '1px solid #eee';
                 
                 const statusClass = item.status === 'processed' ? 'badge-active' : (item.status === 'failed' ? 'badge-blocked' : 'badge-waiting');
-                const normImg = item.status === 'processed' && item.normalized_image 
-                    ? `<img src="${item.normalized_image}" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #eee; border-radius: 4px;">` 
-                    : `<div style="width: 60px; height: 60px; background: #f9fafb; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px dashed #ddd; color: #9ca3af; font-size: 0.7rem; text-align:center;">${item.status === 'processing' ? 'Processing...' : 'Wait AI'}</div>`;
+                
+                // Cải tiến: Thêm title và con trỏ pointer để người dùng biết có thể click
+                let normImg = `<div style="width: 60px; height: 60px; background: #f9fafb; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px dashed #ddd; color: #9ca3af; font-size: 0.7rem; text-align:center; cursor: pointer;" onclick="runSingleNormalization(${item.id})" title="Click to process or refresh this item">${item.status === 'processing' ? 'Processing...' : 'Wait AI'}</div>`;
+                
+                if (item.status === 'processed') {
+                    const cleanPaths = item.clean_image_paths || [];
+                    if (cleanPaths.length > 1) {
+                        normImg = `<div style="display: flex; gap: 4px; overflow-x: auto; max-width: 130px; padding: 2px; cursor: pointer;" onclick="runSingleNormalization(${item.id})" title="Click to re-process or update metadata">`;
+                        cleanPaths.forEach(path => {
+                            const src = path.startsWith('/') ? (BACKEND_URL + path) : path;
+                            normImg += `<img src="${src}" style="width: 45px; height: 45px; object-fit: contain; border: 1px solid #eee; border-radius: 4px; background: white;" title="View Segmented Item">`;
+                        });
+                        normImg += `</div>`;
+                    } else if (item.normalized_image) {
+                        normImg = `<img src="${item.normalized_image}" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #eee; border-radius: 4px; cursor: pointer;" onclick="runSingleNormalization(${item.id})" title="Click to re-process or update metadata">`;
+                    }
+                }
                 
                 tr.innerHTML = `
                     <td style="padding: 15px;"><input type="checkbox" class="norm-checkbox" value="${item.id}"></td>
@@ -2237,10 +2253,13 @@
                     <td style="padding: 15px;"><span class="norm-tag tag-blue">${item.category || 'N/A'}</span></td>
                     <td style="padding: 15px;"><span class="${statusClass}">${item.status.toUpperCase()}</span></td>
                     <td style="padding: 15px; text-align: center; display: flex; gap: 5px; justify-content: center; align-items: center; height: 90px;">
+                        <button class="action-btn" title="Remove BG Only (Eraser)" style="color: #48c774;" onclick="removeBackgroundOnly(${item.product_id}, 'standard', this)">
+                            <i class="fas fa-eraser"></i>
+                        </button>
                         <button class="action-btn" title="Download" style="color: var(--admin-blue);" onclick="downloadNormalized(${item.id})" ${item.status !== 'processed' ? 'disabled' : ''}>
                             <i class="fas fa-download"></i>
                         </button>
-                        <button class="action-btn" title="Re-run AI" style="color: #6366f1;" onclick="runSingleNormalization(${item.id})">
+                        <button class="action-btn" title="Re-run AI / Refresh" style="color: #6366f1;" onclick="runSingleNormalization(${item.id})">
                             <i class="fas fa-redo-alt"></i>
                         </button>
                         <button class="action-btn" title="Remove" style="color: #ef4444;" onclick="deleteSingleNormalization(${item.id})">
@@ -2385,6 +2404,37 @@
                 const row = item.closest('tr');
                 const img = row.querySelector('td:nth-child(3) img');
                 if (img) window.open(img.src, '_blank');
+            }
+        }
+
+        async function removeBackgroundOnly(id, mode = 'standard', btn = null) {
+            if (!btn) btn = event.currentTarget;
+            const originalIcon = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/admin/remove-background-only`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: id, mode: mode })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Background removed successfully!');
+                    loadProducts();
+                    if (!document.getElementById('mod-normalized').classList.contains('hidden')) {
+                        loadNormalizedList();
+                    }
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Connection error');
+            } finally {
+                btn.innerHTML = originalIcon;
+                btn.disabled = false;
             }
         }
 

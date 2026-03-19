@@ -10,7 +10,8 @@ from ultralytics import YOLO
 
 # Tải model YOLOv8 pre-trained (sử dụng bản nano để nhanh và nhẹ)
 _model = None
-_rembg_session = None
+# Cache cho các rembg session khác nhau
+_rembg_sessions = {}
 
 def get_yolo_model():
     global _model
@@ -23,12 +24,15 @@ def get_rembg_session(model_name="u2netp"):
     u2netp: nhanh, nhẹ (default)
     u2net_cloth_seg: chuyên dụng cho quần áo (FASHN VTON recommend)
     """
-    global _rembg_session
-    try:
-        # Nếu model_name là cloth_seg, chúng ta khởi tạo session riêng
-        return new_session(model_name)
-    except Exception:
-        return None
+    global _rembg_sessions
+    if model_name not in _rembg_sessions:
+        try:
+            print(f"[Rembg] Initializing session for {model_name}...")
+            _rembg_sessions[model_name] = new_session(model_name)
+        except Exception as e:
+            print(f"[Rembg] Failed to init session {model_name}: {e}")
+            return None
+    return _rembg_sessions[model_name]
 
 def detect_products(image_path):
     """Phát hiện các vật thể trong ảnh bằng YOLOv8."""
@@ -61,10 +65,19 @@ def extract_main_product(input_path, output_path=None, model_name="u2net_cloth_s
         session = get_rembg_session(model_name)
         
         # Xóa nền
-        if session:
-            img_nobg = remove(img, session=session)
-        else:
-            img_nobg = remove(img)
+        session = get_rembg_session(model_name)
+        
+        # Thử với model chỉ định
+        try:
+            if session:
+                img_nobg = remove(img, session=session)
+            else:
+                img_nobg = remove(img)
+        except Exception as e:
+            print(f"[Processor] Primary segmentation failed: {e}. Falling back to default.")
+            # Fallback sang model mặc định u2netp nếu model_name kia lỗi
+            default_session = get_rembg_session("u2netp")
+            img_nobg = remove(img, session=default_session) if default_session else remove(img)
             
         # --- CẢI TIẾN: Xử lý Mask để lấp đầy lỗ hổng (do tay che) ---
         # Chuyển sang numpy để xử lý OpenCV

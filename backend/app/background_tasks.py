@@ -107,11 +107,37 @@ def process_single_item(item_id, app):
             
             # Xử lý ảnh (RemBG, Inpainting, Resize)
             print(f"[Worker] Running AI processing for item {item_id}...")
-            norm_path = process_garment_for_vton(local_raw, norm_dir)
+            # Sử dụng segment_clean_images logic hoặc tương đương
+            from data_engine.image_classifier import classify_image_type
+            from .ai.product_processor import extract_main_product, split_multi_product_image
             
-            if norm_path:
-                print(f"[Worker] AI processing successful! Saved to: {norm_path}")
-                item.normalized_image_path = f"/static/normalized_selected/{os.path.basename(norm_path)}"
+            with open(local_raw, 'rb') as f: bytes_raw = f.read()
+            img_type = classify_image_type(bytes_raw)
+            
+            paths = []
+            if img_type in ['multiple_items', 'overlapping_set']:
+                paths = split_multi_product_image(local_raw, norm_dir)
+            else:
+                out_name = f"vton_garment_{uuid.uuid4().hex}.png"
+                out_path = os.path.join(norm_dir, out_name)
+                m_name = "u2net_cloth_seg" if img_type == 'model' else "u2netp"
+                res = extract_main_product(local_raw, out_path, model_name=m_name)
+                if res: paths = [res]
+
+            if paths:
+                print(f"[Worker] AI processing successful! Generated {len(paths)} images.")
+                # Base relative path for the first one (primary)
+                primary_rel = f"/static/normalized_selected/{os.path.basename(paths[0])}"
+                item.normalized_image_path = primary_rel
+                
+                # Cập nhật cả bảng Product để đồng bộ
+                if item.product:
+                    import json
+                    rel_list = [f"/static/normalized_selected/{os.path.basename(p)}" for p in paths]
+                    item.product.clean_image_path = primary_rel
+                    item.product.clean_image_paths = json.dumps(rel_list)
+                    item.product.has_model = (img_type == 'model')
+                    item.product.image_type = img_type
                 
                 # Phân loại lại dựa trên tên sản phẩm
                 product_name = item.product.name if item.product else ""

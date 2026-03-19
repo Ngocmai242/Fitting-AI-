@@ -32,15 +32,22 @@ COOKIES_FILE = os.path.join(BASE_DIR, 'shopee_cookies.json')
 
 try:
     import sys
+    sys.path.append(BASE_DIR)
     sys.path.append(os.path.abspath(os.path.join(BASE_DIR, '../backend')))
     from app.ai.pose import extract_keypoints
     from app.ai.image_tools import remove_background_rgba
+    # Import new classifier from local dir or package
+    try:
+        from image_classifier import classify_image_type
+    except ImportError:
+        from data_engine.image_classifier import classify_image_type
     _AI_EXTRAS = True
 except Exception as e:
     print(f"[Crawler] AI Extras import failed: {e}")
     _AI_EXTRAS = False
     def extract_keypoints(*args, **kwargs): return [], None
     def remove_background_rgba(b, *args, **kwargs): return b, "image/jpeg"
+    def classify_image_type(b): return 'unknown'
 
 # ─── MAP category_id → tên tiếng Việt ───────────────────────────────────────
 CATEGORY_MAP = {
@@ -581,29 +588,25 @@ async def _crawl_async(shop_url: str, target_count: int) -> dict:
                 cid      = item.get('catid')
                 cat_name = cat_names.get(cid, 'Khác')
                 
-                # Detect Model & Clean Image if needed
+                # Improved Model & Image Type Detection
                 has_model = False
                 if item.get('image'):
                     try:
                         import requests
                         img_bytes = requests.get(item['image'], timeout=10).content
                         if img_bytes:
-                            pts, err = extract_keypoints(img_bytes)
-                            if not err and pts and len(pts) > 0:
-                                has_model = True
-                                # User rule: If has model, apply rembg (clean nhẹ)
-                                from PIL import Image
-                                import io
-                                # Check if it's a person/not just noise
-                                if len(pts) >= 1:
-                                    clean_bytes, _ = remove_background_rgba(img_bytes)
-                                    # Save clean image to local uploads if we wanted, 
-                                    # but for now we just tag it. 
-                                    # In a real system, we'd save to a separate URL or path.
-                                    pass
+                            img_type = classify_image_type(img_bytes)
+                            has_model = (img_type == 'model')
+                            
+                            # If it's a model, we might want to flag it or process differently
+                            if has_model:
+                                # Example: tag for complex processing later
+                                pass
+                                
                         item['has_model'] = has_model
+                        item['image_type'] = img_type
                     except Exception as e:
-                        print(f"[Crawler] AI tagging failed for {item_id}: {e}")
+                        print(f"[Crawler] AI classification failed for {item_id}: {e}")
 
                 return _normalize(item, shop_id, cat_name)
 

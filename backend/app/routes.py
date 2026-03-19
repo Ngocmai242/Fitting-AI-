@@ -2485,6 +2485,9 @@ def products():
                 'fit_type': p.fit_type,
                 'details': p.details,
                 'shop_name': p.shop_name,
+                'clean_image_paths': _json.loads(p.clean_image_paths) if p.clean_image_paths else [],
+                'has_model': p.has_model,
+                'image_type': getattr(p, 'image_type', 'unknown')
             })
         return jsonify(payload), 200
 
@@ -3337,7 +3340,8 @@ def get_normalized_selected():
             "normalized_image": item.normalized_image_path,
             "category": item.category,
             "status": item.status,
-            "updated_at": item.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            "updated_at": item.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "clean_image_paths": _json.loads(item.product.clean_image_paths) if item.product and item.product.clean_image_paths else []
         })
         
     return jsonify({"success": True, "data": results})
@@ -3428,6 +3432,74 @@ def delete_normalized_items():
         
     db.session.commit()
     return jsonify({"success": True, "deleted": len(items)})
+
+@main_bp.route('/api/admin/remove-background-only', methods=['POST'])
+def remove_background_manual():
+    """Chỉ thực hiện tách nền (Rembg) cho một sản phẩm cụ thể (Manual choice)."""
+    data = request.get_json()
+    product_id = data.get("product_id")
+    mode = data.get("mode", "standard") # 'standard' (u2netp) hoặc 'cloth' (u2net_cloth_seg)
+
+    if not product_id:
+        return jsonify({"success": False, "message": "Product ID required"}), 400
+
+    from .models import Product
+    product = db.session.get(Product, product_id)
+    if not product:
+        return jsonify({"success": False, "message": "Product not found"}), 404
+
+    try:
+        from .ai.product_processor import extract_main_product
+        from .utils import download_garment_image
+        
+        # 1. Download ảnh gốc nếu chưa có local hoặc dùng URL
+        img_url = product.image_url
+        local_raw = download_garment_image(img_url, product.product_url)
+        if not local_raw:
+             return jsonify({"success": False, "message": "Failed to download image"}), 500
+
+        # 2. Xử lý tách nền
+        processed_dir = os.path.join(current_app.static_folder, 'uploads', 'cleaned')
+        os.makedirs(processed_dir, exist_ok=True)
+        
+        out_name = f"manual_clean_{product_id}_{uuid.uuid4().hex[:8]}.png"
+        out_path = os.path.join(processed_dir, out_name)
+        
+        # Chọn model tùy theo mode
+        model_name = "u2net_cloth_seg" if mode == "cloth" else "u2netp"
+        
+        print(f"[Manual BG] Mode: {model_name} | Input: {local_raw}")
+        result_path = extract_main_product(local_raw, out_path, model_name=model_name)
+        
+        if result_path and os.path.exists(result_path):
+            rel_path = f"/uploads/cleaned/{out_name}"
+            product.clean_image_path = rel_path
+            product.norm_status = 'clean'
+            
+            # CẬP NHẬT: Đồng bộ sang bảng NormalizedProduct nếu có
+            from .models import NormalizedProduct
+            norm_item = NormalizedProduct.query.filter_by(product_id=product_id).first()
+            if norm_item:
+                norm_item.normalized_image_path = rel_path
+                norm_item.status = 'processed'
+                # Cố gắng phân loại lại nếu chưa có category
+                if not norm_item.category or norm_item.category == 'N/A':
+                    from .background_tasks import infer_canonical_category_by_name, map_category_to_fashn
+                    db_cat, _ = infer_canonical_category_by_name(product.name)
+                    norm_item.category = map_category_to_fashn(db_cat)
+            
+            db.session.commit()
+            return jsonify({
+                "success": True, 
+                "message": "Background removed successfully!",
+                "clean_image_path": rel_path
+            })
+        else:
+            return jsonify({"success": False, "message": "AI processing failed"}), 500
+            
+    except Exception as e:
+        print(f"[Manual BG] Error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # --- Smart AI Coordination Routes ---
 

@@ -143,6 +143,8 @@ class Product(db.Model):
     occasion_ref = db.relationship("Occasion", back_populates="products")
 
     has_model = db.Column(db.Boolean, default=False)
+    clean_image_paths = db.Column(db.Text)
+    image_type = db.Column(db.String(100))
 
 
 class Outfit(db.Model):

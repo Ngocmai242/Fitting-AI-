@@ -3365,9 +3365,10 @@ def add_to_normalized_queue():
             continue
 
         if existing:
-            # Reset trạng thái về pending để người dùng có thể chuẩn hóa lại
+            # Reset trạng thái về pending và cập nhật lại ảnh gốc mới nhất
             existing.status = "pending"
             existing.original_image_url = product.image_url
+            existing.normalized_image_path = None # Xóa ảnh cũ để giao diện hiển thị đúng
             added_count += 1
         else:
             new_item = NormalizedProduct(

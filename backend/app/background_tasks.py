@@ -82,23 +82,28 @@ def process_single_item(item_id, app):
                 normalization_status["status"] = f"Processing item {item_id}"
             
             item.status = "processing"
+            item.error_message = None # Clear old errors
             db.session.commit()
 
             garment_url = item.original_image_url
             shopee_url = item.product.shopee_url if item.product else None
             
-            print(f"[Worker] Processing item {item_id} | URL: {garment_url[:40]}...")
+            print(f"[Worker] Processing item {item_id} | URL: {garment_url[:40] if garment_url else 'None'}...")
             
             if not garment_url and not shopee_url:
-                print(f"[Worker] Error: No URL for item {item_id}")
+                err_msg = "Error: No URL provided for item"
+                print(f"[Worker] {err_msg} {item_id}")
                 item.status = "failed"
+                item.error_message = err_msg
                 db.session.commit()
                 return False
 
             local_raw = download_garment_image(garment_url, shopee_url)
             if not local_raw:
-                print(f"[Worker] Error: Download failed for item {item_id}")
+                err_msg = "Error: Failed to download image from all sources"
+                print(f"[Worker] {err_msg} for item {item_id}")
                 item.status = "failed"
+                item.error_message = err_msg
                 db.session.commit()
                 return False
 
@@ -111,59 +116,90 @@ def process_single_item(item_id, app):
             from data_engine.image_classifier import classify_image_type
             from .ai.product_processor import extract_main_product, split_multi_product_image
             
-            with open(local_raw, 'rb') as f: bytes_raw = f.read()
-            img_type = classify_image_type(bytes_raw)
-            
-            paths = []
-            if img_type in ['multiple_items', 'overlapping_set']:
-                paths = split_multi_product_image(local_raw, norm_dir)
-            else:
-                out_name = f"vton_garment_{uuid.uuid4().hex}.png"
-                out_path = os.path.join(norm_dir, out_name)
-                m_name = "u2net_cloth_seg" if img_type == 'model' else "u2netp"
-                res = extract_main_product(local_raw, out_path, model_name=m_name)
-                if res: paths = [res]
-
-            if paths:
-                print(f"[Worker] AI processing successful! Generated {len(paths)} images.")
-                # Base relative path for the first one (primary)
-                primary_rel = f"/static/normalized_selected/{os.path.basename(paths[0])}"
-                item.normalized_image_path = primary_rel
+            try:
+                with open(local_raw, 'rb') as f: bytes_raw = f.read()
+                # Thử phân loại ảnh để chọn model AI phù hợp
+                try:
+                    img_type = classify_image_type(bytes_raw)
+                except Exception as e:
+                    print(f"[Worker] Classification failed: {e}. Defaulting to 'flat'")
+                    img_type = 'flat'
                 
-                # Cập nhật cả bảng Product để đồng bộ
-                if item.product:
+                paths = []
+                if img_type in ['multiple_items', 'overlapping_set']:
+                    try:
+                        paths = split_multi_product_image(local_raw, norm_dir)
+                    except Exception as e:
+                        print(f"[Worker] Multi-split failed: {e}. Falling back to single extract.")
+                        img_type = 'flat' # Thử lại như ảnh đơn
+                
+                if not paths:
+                    out_name = f"vton_garment_{uuid.uuid4().hex}.png"
+                    out_path = os.path.join(norm_dir, out_name)
+                    
+                    # Nếu ảnh có người mẫu, dùng cloth_seg, nếu không dùng u2netp (nhanh hơn)
+                    m_name = "u2net_cloth_seg" if img_type == 'model' else "u2netp"
+                    
+                    try:
+                        res = extract_main_product(local_raw, out_path, model_name=m_name)
+                        if res: paths = [res]
+                    except Exception as e:
+                        print(f"[Worker] Primary extraction failed: {e}. Trying fallback model.")
+                        # Fallback cuối cùng sang u2netp nếu cloth_seg bị lỗi
+                        try:
+                            res = extract_main_product(local_raw, out_path, model_name="u2netp")
+                            if res: paths = [res]
+                        except Exception as e2:
+                            print(f"[Worker] All extraction attempts failed for {item_id}: {e2}")
+                            raise e2
+
+                if paths:
+                    print(f"[Worker] AI processing successful! Generated {len(paths)} images.")
                     import json
                     rel_list = [f"/static/normalized_selected/{os.path.basename(p)}" for p in paths]
-                    item.product.clean_image_path = primary_rel
-                    item.product.clean_image_paths = json.dumps(rel_list)
-                    item.product.has_model = (img_type == 'model')
-                    item.product.image_type = img_type
-                
-                # Phân loại lại dựa trên tên sản phẩm
-                product_name = item.product.name if item.product else ""
-                db_cat, _ = infer_canonical_category_by_name(product_name)
-                
-                # Map sang format Fashn VTON
-                item.category = map_category_to_fashn(db_cat)
-                item.status = "processed"
-                
-                # Lưu vào DB
-                db.session.add(item)
-                db.session.commit()
-                return True
-            else:
-                print(f"[Worker] AI processing failed (no output) for item {item_id}")
+                    primary_rel = rel_list[0]
+                    item.normalized_image_path = primary_rel
+                    item.normalized_image_paths = json.dumps(rel_list)
+                    
+                    # Cập nhật cả bảng Product để đồng bộ
+                    if item.product:
+                        item.product.clean_image_path = primary_rel
+                        item.product.clean_image_paths = json.dumps(rel_list)
+                        item.product.has_model = (img_type == 'model')
+                        item.product.image_type = img_type
+                    
+                    # Phân loại lại dựa trên tên sản phẩm
+                    product_name = item.product.name if item.product else ""
+                    db_cat, _ = infer_canonical_category_by_name(product_name)
+                    
+                    # Map sang format Fashn VTON
+                    item.category = map_category_to_fashn(db_cat)
+                    item.status = "processed"
+                    item.error_message = None
+                    
+                    # Lưu vào DB
+                    db.session.add(item)
+                    db.session.commit()
+                    return True
+                else:
+                    raise Exception("AI processing failed to produce any output paths")
+
+            except Exception as ai_err:
+                print(f"[Worker] AI Error for item {item_id}: {ai_err}")
                 item.status = "failed"
+                item.error_message = f"AI Error: {str(ai_err)}"
                 db.session.commit()
                 return False
+
         except Exception as e:
             app.logger.error(f"Error processing item {item_id}: {e}")
-            print(f"[Worker] EXCEPTION mapping item {item_id}: {e}")
+            print(f"[Worker] CRITICAL EXCEPTION for item {item_id}: {e}")
             try:
                 db.session.rollback()
                 failed_item = db.session.get(NormalizedProduct, item_id)
                 if failed_item:
                     failed_item.status = "failed"
+                    failed_item.error_message = f"Critical Exception: {str(e)}"
                     db.session.commit()
             except: pass
             

@@ -86,6 +86,21 @@ def _ensure_tryon_schema(db_path: str) -> None:
             except Exception:
                 pass
 
+        # --- NORMALIZED_PRODUCTS MIGRATION ---
+        cur.execute("PRAGMA table_info(normalized_products)")
+        norm_cols = {row[1] for row in cur.fetchall()}
+        if norm_cols: # Only if table exists
+            if "error_message" not in norm_cols:
+                try:
+                    cur.execute("ALTER TABLE normalized_products ADD COLUMN error_message TEXT")
+                    conn.commit()
+                except Exception: pass
+            if "normalized_image_paths" not in norm_cols:
+                try:
+                    cur.execute("ALTER TABLE normalized_products ADD COLUMN normalized_image_paths TEXT DEFAULT '[]'")
+                    conn.commit()
+                except Exception: pass
+
         conn.commit()
         conn.close()
     except Exception:
@@ -115,6 +130,9 @@ def create_app():
     db_path = os.path.abspath(db_path)
 
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"check_same_thread": False}
+    }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Must run before importing models/routes to avoid "no such column" if new columns are added.

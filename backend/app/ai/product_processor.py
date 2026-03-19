@@ -213,7 +213,7 @@ def split_multi_product_image(image_path, output_dir):
         
         temp_id = uuid.uuid4().hex
         temp_path = os.path.join(output_dir, f"temp_{temp_id}.png")
-        cropped_region.save(temp_path)
+        cropped_region.save(temp_path, optimize=True)
 
         final_filename = f"product_{i}_{temp_id}.png"
         final_path = os.path.join(output_dir, final_filename)

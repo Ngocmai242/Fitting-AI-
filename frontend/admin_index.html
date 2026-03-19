@@ -2232,7 +2232,7 @@
                 let normImg = `<div style="width: 60px; height: 60px; background: #f9fafb; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px dashed #ddd; color: #9ca3af; font-size: 0.7rem; text-align:center; cursor: pointer;" onclick="runSingleNormalization(${item.id})" title="Click to process or refresh this item">${item.status === 'processing' ? 'Processing...' : 'Wait AI'}</div>`;
                 
                 if (item.status === 'processed') {
-                    const cleanPaths = item.clean_image_paths || [];
+                    const cleanPaths = item.normalized_image_paths || [];
                     if (cleanPaths.length > 1) {
                         normImg = `<div style="display: flex; gap: 4px; overflow-x: auto; max-width: 130px; padding: 2px; cursor: pointer;" onclick="runSingleNormalization(${item.id})" title="Click to re-process or update metadata">`;
                         cleanPaths.forEach(path => {

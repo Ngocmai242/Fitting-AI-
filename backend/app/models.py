@@ -120,7 +120,7 @@ class Product(db.Model):
     material = db.Column(db.String(100))
     fit_type = db.Column(db.String(50))
     color_tone = db.Column(db.String(20))
-    clean_image_path = db.Column(db.String(255))
+    clean_image_path = db.Column(db.String(255), nullable=True)
     color_primary = db.Column(db.String(50))
     color_secondary = db.Column(db.String(50))
     hex_primary = db.Column(db.String(10))
@@ -143,7 +143,7 @@ class Product(db.Model):
     occasion_ref = db.relationship("Occasion", back_populates="products")
 
     has_model = db.Column(db.Boolean, default=False)
-    clean_image_paths = db.Column(db.Text)
+    clean_image_paths = db.Column(db.Text, nullable=True, default='[]')  # JSON array of paths
     image_type = db.Column(db.String(100))
 
 
@@ -168,6 +168,8 @@ class NormalizedProduct(db.Model):
     normalized_image_path = db.Column(db.String(500))
     category = db.Column(db.String(100))
     status = db.Column(db.String(20), default="pending")  # pending, processed, failed
+    error_message = db.Column(db.Text, nullable=True)
+    normalized_image_paths = db.Column(db.Text, nullable=True, default='[]') # JSON list
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

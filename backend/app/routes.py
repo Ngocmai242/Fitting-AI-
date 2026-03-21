@@ -47,6 +47,7 @@ class VTONQueue:
     def __init__(self):
         self.queue = queue.Queue()
         self.results = {}
+        self.active_task_id = None
         self.worker_thread = threading.Thread(target=self._worker, daemon=True)
         self.worker_thread.start()
 
@@ -54,6 +55,7 @@ class VTONQueue:
         while True:
             task_id, func, args, kwargs = self.queue.get()
             try:
+                self.active_task_id = task_id
                 # Basic cleanup of old results if dictionary grows too large
                 if len(self.results) > 100:
                     try:
@@ -69,6 +71,7 @@ class VTONQueue:
                 print(f"[Queue] Task {task_id} failed: {e}")
                 self.results[task_id] = {"status": "error", "message": str(e)}
             finally:
+                self.active_task_id = None
                 self.queue.task_done()
 
     def add_task(self, func, *args, **kwargs):
@@ -200,13 +203,17 @@ def is_busy_error(exception):
     return False
 
 @retry(
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
     retry=retry_if_exception(is_busy_error),
     reraise=True # Important to let the caller handle it if all retries fail
 )
 def call_fashn_vton_raw(person_path, garment_path, fashn_cat, space_id, hf_token):
-    from gradio_client import Client, handle_file
+    try:
+        from gradio_client import Client, handle_file as file_helper
+    except ImportError:
+        from gradio_client import Client, file as file_helper
+        
     print(f"[FASHN-VTON] Connecting to {space_id}...")
     _wake_space(space_id)
     client = Client(space_id, hf_token=hf_token) if hf_token else Client(space_id)
@@ -215,16 +222,16 @@ def call_fashn_vton_raw(person_path, garment_path, fashn_cat, space_id, hf_token
     # Some mirrors might use api_name='/run' or '/predict'
     try:
         result = client.predict(
-            person_image=handle_file(person_path),
-            garment_image=handle_file(garment_path),
+            person_image=file_helper(person_path),
+            garment_image=file_helper(garment_path),
             category=fashn_cat,
         )
     except Exception as e:
         print(f"[FASHN-VTON] Keyword 'person_image' failed, trying 'model_image'...")
         # Fallback to model_image if person_image fails (some mirrors use it)
         result = client.predict(
-            model_image=handle_file(person_path),
-            garment_image=handle_file(garment_path),
+            model_image=file_helper(person_path),
+            garment_image=file_helper(garment_path),
             category=fashn_cat,
         )
     return result
@@ -235,7 +242,10 @@ def call_fashn_vton(person_path, garment_path, category="tops"):
     category in ["tops", "bottoms", "one-pieces"]
     """
     try:
-        from gradio_client import Client, handle_file
+        try:
+            from gradio_client import Client, handle_file
+        except ImportError:
+            from gradio_client import Client, file
     except ImportError:
         print("[FASHN-VTON] gradio_client missing")
         return person_path, True
@@ -293,17 +303,21 @@ def _get_image_similarity(path1, path2):
         return 0.0
 
 @retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=15),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
     retry=retry_if_exception(is_busy_error),
     reraise=True
 )
 def call_idm_vton_raw(client, person_path, garment_path, api_name=None):
-    from gradio_client import handle_file
+    try:
+        from gradio_client import handle_file as file_helper
+    except ImportError:
+        from gradio_client import file as file_helper
+        
     if api_name:
         return client.predict(
-            dict={"background": handle_file(person_path), "layers": [], "composite": None},
-            garm_img=handle_file(garment_path),
+            dict={"background": file_helper(person_path), "layers": [], "composite": None},
+            garm_img=file_helper(garment_path),
             garment_des="",
             is_checked=True,
             is_checked_crop=False,
@@ -313,8 +327,8 @@ def call_idm_vton_raw(client, person_path, garment_path, api_name=None):
         )
     else:
         return client.predict(
-            dict={"background": handle_file(person_path), "layers": [], "composite": None},
-            garm_img=handle_file(garment_path),
+            dict={"background": file_helper(person_path), "layers": [], "composite": None},
+            garm_img=file_helper(garment_path),
             garment_des="",
             is_checked=True,
             is_checked_crop=False,
@@ -328,7 +342,10 @@ def call_idm_vton(person_path, garment_path):
     Returns (local_path, is_fallback).
     """
     try:
-        from gradio_client import Client, handle_file
+        try:
+            from gradio_client import Client, handle_file
+        except ImportError:
+            from gradio_client import Client, file
     except ImportError:
         print("[IDM-VTON] gradio_client not installed -> fallback")
         return _make_fallback(person_path), True
@@ -382,12 +399,13 @@ def call_idm_vton(person_path, garment_path):
     print("[IDM-VTON] All spaces failed -> fallback")
     return _make_fallback(person_path), True
 
-def download_garment_image(image_url: str, shopee_url: str):
+def download_garment_image(image_url: str, shopee_url: str, save_dir: str = None):
     """
     Download ảnh garment về local. Thử image_url trước, nếu lỗi thử shopee_url.
     Trả về đường dẫn file local, hoặc None nếu hoàn toàn thất bại.
     """
-    save_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
+    if save_dir is None:
+        save_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     os.makedirs(save_dir, exist_ok=True)
 
@@ -3071,14 +3089,34 @@ def tryon():
     return jsonify({'status': 'success'}), 200
 
 
-def _run_vton_pipeline(in_path, garment_path, garment_type, recommended, cat, results_dir, out_path):
+def _run_vton_pipeline(in_path, best_match, garment_type, recommended, cat, results_dir, out_path, static_folder_path):
     """
     Core VTON logic to be run in the worker thread.
     """
     is_fallback = True
     final_path = in_path
 
+    def _resolve_clean_abs(clean_rel):
+        if not clean_rel: return None
+        try:
+            rel = str(clean_rel).lstrip("/").replace("\\", "/")
+            abs_path = os.path.abspath(os.path.join(static_folder_path, rel))
+            if os.path.exists(abs_path): return abs_path
+        except: pass
+        return None
+
     try:
+        # Download and process the garment for Single Item Try-On FIRST
+        garment_url = best_match.get('image_url')
+        shopee_url = best_match.get('shopee_url')
+        clean_abs = _resolve_clean_abs(best_match.get("clean_image_path"))
+        garment_raw_path = clean_abs or (download_garment_image(garment_url, shopee_url, save_dir=os.path.join(static_folder_path, 'uploads', 'tryon')) if garment_url else None)
+        
+        garment_path = None
+        if garment_raw_path and os.path.exists(garment_raw_path):
+            processed_dir = os.path.join(static_folder_path, 'uploads', 'tryon', 'processed')
+            garment_path = process_garment_for_vton(garment_raw_path, processed_dir) or garment_raw_path
+
         # Determine Rendering Flow (Single vs 2-Step)
         if garment_type.lower() == "full outfit":
             print("[TRYON] Full Outfit detected. Starting 2-step process...")
@@ -3094,9 +3132,9 @@ def _run_vton_pipeline(in_path, garment_path, garment_type, recommended, cat, re
             if top_item:
                 print(f"[TRYON] Step 1: Applying TOP {top_item['name']}")
                 clean_path = _resolve_clean_abs(top_item.get('clean_image_path'))
-                t_garment_raw = clean_path if clean_path else download_garment_image(top_item['image_url'], top_item.get('shopee_url'))
+                t_garment_raw = clean_path if clean_path else download_garment_image(top_item['image_url'], top_item.get('shopee_url'), save_dir=os.path.join(static_folder_path, 'uploads', 'tryon'))
                 if t_garment_raw:
-                    processed_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon', 'processed')
+                    processed_dir = os.path.join(static_folder_path, 'uploads', 'tryon', 'processed')
                     t_garment = process_garment_for_vton(t_garment_raw, processed_dir) or t_garment_raw
                     res_top, fb_top = call_fashn_vton(current_person_path, t_garment, category="tops")
                     
@@ -3112,9 +3150,9 @@ def _run_vton_pipeline(in_path, garment_path, garment_type, recommended, cat, re
             if bottom_item:
                 print(f"[TRYON] Step 2: Applying BOTTOM {bottom_item['name']}")
                 clean_path = _resolve_clean_abs(bottom_item.get('clean_image_path'))
-                b_garment_raw = clean_path if clean_path else download_garment_image(bottom_item['image_url'], bottom_item.get('shopee_url'))
+                b_garment_raw = clean_path if clean_path else download_garment_image(bottom_item['image_url'], bottom_item.get('shopee_url'), save_dir=os.path.join(static_folder_path, 'uploads', 'tryon'))
                 if b_garment_raw:
-                    processed_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon', 'processed')
+                    processed_dir = os.path.join(static_folder_path, 'uploads', 'tryon', 'processed')
                     b_garment = process_garment_for_vton(b_garment_raw, processed_dir) or b_garment_raw
                     res_bottom, fb_bottom = call_fashn_vton(current_person_path, b_garment, category="bottoms")
                     
@@ -3151,10 +3189,14 @@ def _run_vton_pipeline(in_path, garment_path, garment_type, recommended, cat, re
             is_fallback = fb
 
         # Copy to final out_path
+        import shutil
         shutil.copyfile(final_path, out_path)
         return {"path": out_path, "is_fallback": is_fallback}
         
     except Exception as ai_err:
+        import traceback
+        traceback.print_exc()
+        import shutil
         print(f"[TRYON] Pipeline error: {ai_err}")
         shutil.copyfile(in_path, out_path)
         return {"path": out_path, "is_fallback": True}
@@ -3267,9 +3309,10 @@ def virtual_tryon_api():
                 "recommended_outfits": recommended
             }), 200
 
+        # Pass best_match directly so worker can download slowly without locking API
         task_id = vton_processor_queue.add_task(
             _run_vton_pipeline,
-            in_path, garment_path, garment_type, recommended, fashn_cat, results_dir, out_path
+            in_path, best_match, garment_type, recommended, fashn_cat, results_dir, out_path, current_app.static_folder
         )
 
         # Trả về task_id ngay lập tức để frontend poll
@@ -3277,7 +3320,7 @@ def virtual_tryon_api():
             "success": True,
             "task_id": task_id,
             "status": "pending",
-            "message": "Đã thêm vào hàng đợi xử lý AI..."
+            "message": "Đang chuẩn bị áo quần..."
         }), 202
 
     except Exception as e:
@@ -3305,13 +3348,19 @@ def virtual_tryon_status(task_id):
             }), 200
     
     is_pending = any(t[0] == task_id for t in list(vton_processor_queue.queue.queue))
-    if is_pending:
+    if is_pending or task_id == getattr(vton_processor_queue, 'active_task_id', None):
         return jsonify({
             "success": True,
             "status": "pending",
-            "message": "Đang chờ đến lượt xử lý..."
+            "message": "Đang xử lý phối đồ AI..."
         }), 200
         
+    print(f"[DEBUG 404] Task {task_id} not found in results, queue, or active_task_id.")
+    print(f"[DEBUG 404] active_task_id is: {getattr(vton_processor_queue, 'active_task_id', None)}")
+    print(f"[DEBUG 404] results keys: {list(vton_processor_queue.results.keys())}")
+    print(f"[DEBUG 404] queue size: {vton_processor_queue.queue.qsize()}")
+    with open("c:\\Mai\\4\\backend\\debug.log", "a") as f:
+        f.write(f"[DEBUG 404] Task {task_id} not found. active={getattr(vton_processor_queue, 'active_task_id', None)}, results={list(vton_processor_queue.results.keys())}, queue_size={vton_processor_queue.queue.qsize()}\n")
     return jsonify({"success": False, "message": "Task not found"}), 404
 
 @main_bp.route('/api/admin/normalized-selected', methods=['GET'])
@@ -3900,3 +3949,82 @@ def get_shop_mapping_route():
         return jsonify(mapping)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==========================================
+# 🧠 Hệ thống phối đồ hoàn toàn local (LLM + Vector Search)
+# ==========================================
+@main_bp.route('/api/style-outfit', methods=['POST'])
+def style_outfit():
+    """
+    API 100% Local: Nhận yêu cầu -> Dùng Llama (Ollama) -> Tìm DB bằng Vector Search (Sentence-BERT)
+    """
+    try:
+        data = request.json or {}
+        gender = data.get('gender', 'Nữ')
+        occasion = data.get('occasion', 'Tự do')
+        body_type = data.get('body_type', 'Bình thường')
+        budget = data.get('budget', 'Bất kỳ')
+
+        # 1. Gọi Llama local qua lớp FashionLLM
+        from app.ai.advanced_pipeline.llm_advisor import FashionLLM
+        llm = FashionLLM(model_id="llama3.2:3b")
+        
+        user_info = {
+            "gender": gender,
+            "body_shape": body_type,
+            "measurements": {"shoulder": "?", "chest": "?", "waist": "?", "hip": "?"} 
+        }
+        
+        # LLM trả về cấu trúc JSON gồm 3 recommendations
+        advice = llm.generate_advice(user_info)
+        
+        if "error" in advice:
+            return jsonify({"success": False, "error": advice["error"]}), 500
+            
+        recommendations = advice.get("recommendations", [])
+        
+        # 2. Tìm kiếm Vector bằng VectorSearchEngine
+        from app.ai.advanced_pipeline.vector_search import vector_searcher
+        
+        # Đảm bảo index đã được build (sẽ mất vài giây lần đầu)
+        if vector_searcher.embeddings is None:
+            vector_searcher.build_index(db.session)
+            
+        outfits_result = []
+        for rec in recommendations:
+            top_query = rec.get("top_description", "")
+            bot_query = rec.get("bottom_description", "")
+            
+            # Nếu LLM không cấu trúc tốt mà nhét hết vào 'reason'
+            if not top_query and not bot_query:
+                top_query = "áo " + rec.get("reason", "")[:50]
+                bot_query = "quần " + rec.get("reason", "")[:50]
+
+            # Vector Search Top 1
+            top_matches = vector_searcher.search_similar(db.session, top_query, top_k=1)
+            bot_matches = vector_searcher.search_similar(db.session, bot_query, top_k=1)
+            
+            # Format trả về giống `get_recommended_outfits`
+            def format_item(p):
+                return {
+                    'id': p.id,
+                    'name': p.name,
+                    'price': p.price,
+                    'image_url': p.image_url,
+                    'clean_image_path': getattr(p, "clean_image_path", None),
+                    'shopee_url': getattr(p, "shopee_url", None) or p.product_url,
+                }
+                
+            outfits_result.append({
+                "title": rec.get("title", "Outfit"),
+                "reason": rec.get("reason", "Phù hợp với bạn."),
+                "top": format_item(top_matches[0]) if top_matches else None,
+                "bottom": format_item(bot_matches[0]) if bot_matches else None
+            })
+
+        return jsonify({"success": True, "outfits": outfits_result})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500

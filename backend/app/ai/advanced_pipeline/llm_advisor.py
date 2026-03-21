@@ -1,82 +1,63 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import requests
+import json
 
 class FashionLLM:
     """
-    LLM Interface for providing fashion advice.
-    Optimized for Gemma 3 or Llama 4.
+    LLM Interface for providing fashion advice using localized Ollama.
+    Optimized for Llama 3.2 3B via API.
     """
-    def __init__(self, model_id="google/gemma-3-4b-it"):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Loading LLM {model_id} on {self.device}...")
-        
-        # Using 4-bit quantization if bitsandbytes is available
-        try:
-            from transformers import BitsAndBytesConfig
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.bfloat16
-            )
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, 
-                quantization_config=bnb_config,
-                device_map="auto"
-            )
-        except Exception:
-            # Fallback for systems without bitsandbytes or GPU
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id, 
-                torch_dtype=torch.float32 if self.device.type == 'cpu' else torch.bfloat16,
-                device_map="auto"
-            )
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+    def __init__(self, model_id="llama3.2:3b", host="http://localhost:11434"):
+        self.model_id = model_id
+        self.host = host
+        print(f"Initialized LLM Advisor using Ollama model: {self.model_id} at {self.host}")
 
     def generate_advice(self, user_info):
         """
         user_info: dict with keys {gender, body_shape, measurements}
         """
-        m = user_info['measurements']
-        prompt = f"""Bạn là chuyên gia tư vấn thời trang cao cấp. Dựa trên thông tin sau:
-- Giới tính: {user_info['gender']}
-- Dáng người: {user_info['body_shape']}
-- Số đo chi tiết: Vai {m['shoulder']}cm, Ngực {m['chest']}cm, Eo {m['waist']}cm, Hông {m['hip']}cm.
+        prompt = f"""Bạn là một chuyên gia tư vấn thời trang cao cấp. Dựa trên thông tin người dùng:
+- Giới tính: {user_info.get('gender', 'N/A')}
+- Dáng người: {user_info.get('body_shape', 'N/A')}
+- Số đo chi tiết: Vai {user_info.get('measurements', {}).get('shoulder', 'N/A')}cm, Ngực {user_info.get('measurements', {}).get('chest', 'N/A')}cm, Eo {user_info.get('measurements', {}).get('waist', 'N/A')}cm, Hông {user_info.get('measurements', {}).get('hip', 'N/A')}cm.
 
-Hãy gợi ý 3 bộ trang phục từ Shopee phù hợp để tôn lên ưu điểm và che khuyết điểm. 
-Đối với mỗi bộ trang phục, hãy cung cấp:
-1. Tên set đồ.
-2. Tại sao nó phù hợp với số đo trên.
-
-Trả về kết quả dưới dạng JSON có cấu trúc như sau:
+Hãy gợi ý 3 bộ trang phục hoàn chỉnh (gồm áo, quần/váy) phù hợp để tôn lên ưu điểm và che khuyết điểm của dáng người này.
+Trả về bằng tiếng Việt, cấu trúc nghiêm ngặt bằng JSON như sau:
 {{
   "recommendations": [
-    {{ "title": "Set 1", "reason": "..." }},
-    {{ "title": "Set 2", "reason": "..." }},
-    {{ "title": "Set 3", "reason": "..." }}
+    {{ "title": "Tên bộ 1", "top_description": "Mô tả áo...", "bottom_description": "Mô tả quần/váy...", "reason": "Lý do phù hợp..." }},
+    {{ "title": "Tên bộ 2", "top_description": "Mô tả áo...", "bottom_description": "Mô tả quần/váy...", "reason": "Lý do phù hợp..." }},
+    {{ "title": "Tên bộ 3", "top_description": "...", "bottom_description": "...", "reason": "..." }}
   ]
 }}
+Không trả lời thêm bất cứ nội dung nào ngoài JSON.
 """
-        # Gemma 3 specific prompt formatting if needed
-        # inputs = self.tokenizer.apply_chat_template([{"role": "user", "content": prompt}], return_tensors="pt").to(self.device)
-        
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-        
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs, 
-                max_new_tokens=400,
-                temperature=0.7,
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-            
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # Extract JSON part from response
         try:
-            import json
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
-            return json.loads(response[json_start:json_end])
-        except Exception:
-            return {"raw_text": response}
+            response = requests.post(
+                f'{self.host}/api/generate',
+                json={
+                    'model': self.model_id,
+                    'prompt': prompt,
+                    'stream': False,
+                    'format': 'json'  # Force JSON output for Ollama 3.x
+                },
+                timeout=60
+            )
+            response.raise_for_status()
+            
+            # The response from Ollama is a JSON string containing our data
+            raw_output = response.json().get('response', '')
+            
+            # Find JSON block (if any formatting leaked)
+            json_start = raw_output.find('{')
+            json_end = raw_output.rfind('}') + 1
+            if json_start != -1 and json_end != -1:
+                return json.loads(raw_output[json_start:json_end])
+            else:
+                return json.loads(raw_output)
+                
+        except json.JSONDecodeError:
+            print(f"[Ollama LLM] Failed to parse JSON: {raw_output}")
+            return {"error": "Invalid format returned by LLM."}
+        except Exception as e:
+            print(f"[Ollama LLM] API Error: {e}")
+            return {"error": "Could not connect to Ollama local server."}

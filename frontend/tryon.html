@@ -451,14 +451,16 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        const API_BASE = "https://batteries-mere-strongly-foto.trycloudflare.com";
+        const API_BASE = "http://localhost:8080";
         let selectedFile = null;
+        let currentPersonId = null; // Trạng thái ảnh người mẫu trên server (Phase 1)
+        let isUploadingPerson = false;
 
         function getParam(name) {
             try { return new URLSearchParams(window.location.search).get(name); } catch(e){ return null; }
         }
 
-        function handleFileSelect(input) {
+        async function handleFileSelect(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
                 if (file.size > 10 * 1024 * 1024) {
@@ -473,12 +475,43 @@
                     document.getElementById('preview-container').style.display = 'block';
                 }
                 reader.readAsDataURL(file);
+
+                // --- Giai đoạn 1: Tự động upload ảnh người mẫu khi vừa chọn xong ---
+                await uploadPerson(file);
+            }
+        }
+
+        async function uploadPerson(file) {
+            isUploadingPerson = true;
+            showToast('Đang tải ảnh người mẫu lên server...', 'success');
+            
+            const formData = new FormData();
+            formData.append('photo', file);
+
+            try {
+                const res = await fetch(`${API_BASE}/api/upload-person`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentPersonId = data.person_id;
+                    showToast('Đã lưu ảnh người mẫu vào bộ nhớ server.', 'success');
+                } else {
+                    showToast('Lỗi lưu ảnh người mẫu: ' + data.message, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Không thể kết nối với server để lưu ảnh người.', 'error');
+            } finally {
+                isUploadingPerson = false;
             }
         }
 
         function removeImage(e) {
             e.stopPropagation();
             selectedFile = null;
+            currentPersonId = null;
             document.getElementById('file-input').value = '';
             document.getElementById('upload-zone').style.display = 'block';
             document.getElementById('preview-container').style.display = 'none';
@@ -602,12 +635,22 @@
                 // Disable button to prevent double clicks
                 if (runBtn) runBtn.disabled = true;
                 
+                if (isUploadingPerson) {
+                    showToast('Vui lòng đợi ảnh người mẫu tải lên xong...', 'error');
+                    runBtn.disabled = false; // Re-enable if upload is still in progress
+                    return;
+                }
+
                 loading.style.display = 'flex';
                 loadingTitle.innerHTML = '✨ AI Đang May Đo...';
-                statusText.textContent = "Đang gửi yêu cầu tới Colab GPU... Vui lòng không tắt trang (Có thể mất 2-5 phút).";
+                statusText.textContent = "Đang lấy ảnh đã lưu trên Server... Kết nối GPU Colab (Có thể mất 2-5 phút).";
 
                 const formData = new FormData();
-                formData.append('photo', selectedFile);
+                if (currentPersonId) {
+                    formData.append('person_id', currentPersonId); // Sử dụng ID đã up ở Phase 1
+                } else {
+                    formData.append('photo', selectedFile); // Fallback nếu upload Phase 1 lỗi
+                }
                 formData.append('garments', JSON.stringify(garments)); // Serialize mảng garments
 
                 const response = await fetch(`${API_BASE}/api/virtual-tryon`, {

@@ -3069,16 +3069,42 @@ def recommend_products_api():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@main_bp.route('/api/upload-person', methods=['POST'])
+def upload_person_api():
+    """Tải lên ảnh người mẫu trước để lưu trữ trên server."""
+    try:
+        if 'photo' not in request.files:
+            return jsonify({'success': False, 'message': 'No file uploaded'}), 400
+        
+        photo = request.files['photo']
+        upload_dir = os.path.join(current_app.static_folder, 'uploads', 'tryon')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        ext = os.path.splitext(photo.filename)[1].lower() or '.jpg'
+        filename = f"person_{uuid.uuid4().hex}{ext}"
+        path = os.path.join(upload_dir, filename)
+        photo.save(path)
+        
+        return jsonify({
+            'success': True, 
+            'person_id': filename,
+            'message': 'Đã tải ảnh người mẫu lên server thành công'
+        })
+    except Exception as e:
+        print(f"[API] Upload Person Error: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @main_bp.route('/api/virtual-tryon', methods=['POST'])
 def virtual_tryon_api():
     import json
     try:
-        if 'photo' not in request.files:
-            return jsonify({'success': False, 'message': 'photo is required'}), 400
-            
-        photo = request.files['photo']
+        photo = request.files.get('photo')
+        person_id = request.form.get('person_id')
         garments_json = request.form.get('garments')
         
+        if not photo and not person_id:
+            return jsonify({'success': False, 'message': 'photo OR person_id is required'}), 400
+            
         garments = []
         if garments_json:
             try:
@@ -3094,10 +3120,17 @@ def virtual_tryon_api():
         os.makedirs(upload_dir, exist_ok=True)
         os.makedirs(results_dir, exist_ok=True)
 
-        ext = os.path.splitext(photo.filename)[1].lower() or '.jpg'
-        in_name = f"{uuid.uuid4().hex}{ext}"
-        in_path = os.path.join(upload_dir, in_name)
-        photo.save(in_path)
+        if person_id:
+            # Sử dụng ảnh đã có trên server
+            in_path = os.path.join(upload_dir, person_id)
+            if not os.path.exists(in_path):
+                return jsonify({'success': False, 'message': 'Ảnh người mẫu đã hết hạn hoặc không tồn tại (person_id invalid)'}), 404
+        else:
+            # Tải lên ảnh mới
+            ext = os.path.splitext(photo.filename)[1].lower() or '.jpg'
+            in_name = f"{uuid.uuid4().hex}{ext}"
+            in_path = os.path.join(upload_dir, in_name)
+            photo.save(in_path)
 
         out_name = f"result_{uuid.uuid4().hex}.jpg"
         out_path = os.path.join(results_dir, out_name)

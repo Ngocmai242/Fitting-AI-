@@ -451,7 +451,7 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        const API_BASE = "http://localhost:8080";
+        const API_BASE = "https://batteries-mere-strongly-foto.trycloudflare.com";
         let selectedFile = null;
 
         function getParam(name) {
@@ -638,7 +638,7 @@
             const runBtn = document.getElementById('run-btn');
             
             let attempts = 0;
-            const maxAttempts = 200; // Tăng lên ~8 phút (2.5s * 200 = 500s)
+            const maxAttempts = 300; // Tăng lên ~12.5 phút (2.5s * 300 = 750s) vì GPU Colab cần ~7 phút
 
             const interval = setInterval(async () => {
                 attempts++;
@@ -658,7 +658,7 @@
                         clearInterval(interval);
                         showFinalResult(data);
                         if (data.is_fallback) {
-                            showToast('AI Busy hoặc Lỗi: ' + (data.error_message || 'Đang dùng ảnh gốc'), 'error');
+                            showToast('Lỗi Try-On: ' + (data.error_message || 'Đang dùng ảnh gốc'), 'error');
                         } else {
                             showToast('Thành công! Đã thay đồ xong.', 'success');
                         }

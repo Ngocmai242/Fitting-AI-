@@ -4,8 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import current_app
 from . import db
 from .models import NormalizedProduct
-from .ai.product_processor import process_garment_for_vton
-from .utils import download_garment_image
+from .utils import (
+    download_garment_image,
+    _norm_ascii,
+    infer_canonical_category_by_name,
+    map_category_to_fashn
+)
 import os
 import time
 import uuid
@@ -23,74 +27,7 @@ normalization_status = {
 # Sử dụng Lock để cập nhật normalization_status an toàn giữa các luồng
 status_lock = threading.Lock()
 
-def _norm_ascii(s: str) -> str:
-    if not s: return ""
-    s = s.lower().strip()
-    s = "".join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
-    return s.replace('đ', 'd')
-
-def infer_canonical_category_by_name(name: str) -> tuple[str, str]:
-    n = _norm_ascii(name)
-    # Heuristic keywords for Fashn VTON 1.5 standard
-    
-    # Rule 1: Ưu tiên nhận diện Váy/Đầm/Jumpsuit là 'one-pieces'
-    # "vay" đứng một mình thường là đầm trong văn cảnh bán hàng Shopee/Lazada, 
-    # ngoại trừ khi đi kèm với "chan" (chân váy).
-    if any(k in n for k in ["dam", "dress", "vay lien", "jumpsuit", "set vay", "bodysuit", "vay kieu", "vay tre vai", "vay xoe", "vay body"]):
-        if "chan vay" not in n:
-            return "one-pieces", "dress"
-    
-    # Rule 2: Chân váy hoặc Quần là 'bottoms'
-    if any(k in n for k in ["chan vay", "skirt"]):
-        return "bottoms", "skirt"
-    if any(k in n for k in ["jean", "denim"]):
-        return "bottoms", "jeans"
-    if any(k in n for k in ["quan tay", "trouser", "quan au", "quan dai", "quan baggy", "quan ong suong", "quan jogger"]):
-        return "bottoms", "trousers"
-    if any(k in n for k in ["short", "quan dui", "shorts"]):
-        return "bottoms", "shorts"
-    if "quan" in n:
-        return "bottoms", "trousers"
-
-    # Rule 3: Còn lại là 'tops'
-    if any(k in n for k in ["croptop", "crop top", "crop", "ao ho eo", "baby tee"]):
-        return "tops", "crop_top"
-    if any(k in n for k in ["tshirt", "t-shirt", "tee", "ao thun", "ao phong", "ao canh"]):
-        return "tops", "t_shirt"
-    if "so mi" in n or "shirt" in n or "ao kieu" in n:
-        return "tops", "shirt"
-    if any(k in n for k in ["hoodie", "sweater", "ao len", "cardigan"]):
-        return "tops", "sweater"
-    if any(k in n for k in ["khoac", "jacket", "blazer", "coat", "gi le"]):
-        return "tops", "jacket"
-    
-    # Bổ sung Rule 4: Nếu có "vay" mà không lọt vào Rule 1 (do thiếu keyword phụ)
-    if "vay" in n and "chan vay" not in n:
-        return "one-pieces", "dress"
-
-    # Default safe
-    return "tops", "t_shirt"
-
-def map_category_to_fashn(db_category: str) -> str:
-    if not db_category:
-        return "tops"
-    cat = str(db_category).lower().strip()
-    # Fashn VTON 1.5 standard categories: "tops", "bottoms", "one-pieces"
-    
-    # Rule 1: Ưu tiên váy/đầm vào 'one-pieces'
-    if any(k in cat for k in ["one-pieces", "dress", "jumpsuit", "romper", "đầm", "váy liền", "dam", "bodysuit"]):
-        return "one-pieces"
-    
-    # Rule 2: Nếu là 'vay' (không phải chân váy)
-    if "vay" in cat and "chan vay" not in cat and "skirt" not in cat:
-        return "one-pieces"
-
-    # Rule 3: Các loại quần/chân váy vào 'bottoms'
-    if any(k in cat for k in ["bottoms", "bottom", "quan", "quần", "jeans", "pants", "trousers", "shorts", "skirt", "chan vay"]):
-        return "bottoms"
-        
-    # Rule 4: Mặc định là 'tops'
-    return "tops"
+# Helper functions moved to utils.py
 
 def process_single_item(item_id, app):
     """Hàm xử lý cho một sản phẩm, được thiết kế để chạy trong một luồng riêng biệt."""

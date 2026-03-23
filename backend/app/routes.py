@@ -20,8 +20,7 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 from dotenv import load_dotenv
 
-# Load HF_TOKEN from .env
-load_dotenv()
+# Hugging Face integration removed in favor of Local API
 
 from . import db
 from .models import (
@@ -36,7 +35,12 @@ from .models import (
     User,
 )
 import json as _json
-from .ai.product_processor import process_garment_for_vton
+from .utils import (
+    download_garment_image,
+    _norm_ascii,
+    infer_canonical_category_by_name,
+    map_category_to_fashn
+)
 
 import requests as _req, time as _time
 import threading, queue
@@ -110,400 +114,9 @@ except ImportError as e:
     def change_background(*args, **kwargs): return None, None
     def detect_clothing_color(*args, **kwargs): return "Multicolor", "Pattern"
 
-def map_category_to_fashn(db_category: str) -> str:
-    """
-    Chuyển đổi category trong DB sang format FASHN VTON 1.5.
-    FASHN chỉ nhận: "tops" | "bottoms" | "one-pieces"
-    """
-    if not db_category:
-        return "tops"  # mặc định
+# Removed duplicated helper functions - now imported from .utils
 
-    cat = str(db_category).lower().strip()
-
-    # ONE-PIECES (đầm, váy liền, jumpsuit)
-    if any(x in cat for x in [
-        "one-pieces", "dress", "one-piece", "jumpsuit", "romper", "đầm", "váy liền", "dam"
-    ]):
-        if "chan vay" not in cat and "skirt" not in cat:
-            return "one-pieces"
-    
-    # Trường hợp "vay" mà không phải "chan vay"
-    if "vay" in cat and "chan vay" not in cat and "skirt" not in cat:
-        return "one-pieces"
-
-    # BOTTOMS (quần, chân váy)
-    if any(x in cat for x in [
-        "bottoms", "bottom", "quần", "quan", "jean", "pants", "trousers", "shorts", "skirt", "legging", "chân váy", "chan vay"
-    ]):
-        return "bottoms"
-
-    # TOPS (mặc định cho tất cả áo)
-    return "tops"
-
-def map_garment_type_to_fashn(garment_type: str) -> str:
-    """
-    Chuyển garment_type từ frontend sang FASHN category.
-    garment_type từ frontend: "tops" | "bottoms" | "dress" | "any"
-    """
-    mapping = {
-        "tops":    "tops",
-        "bottoms": "bottoms",
-        "dress":   "one-pieces",
-        "any":     "tops",  # default nếu không chọn
-    }
-    return mapping.get(str(garment_type).lower(), "tops")
-
-def _wake_space(space_id):
-    try:
-        # Pinging the space UI usually wakes it up if it's sleeping
-        _req.get(f"https://huggingface.co/spaces/{space_id}", timeout=8)
-        _time.sleep(4)
-    except Exception:
-        pass
-
-def _make_fallback(person_img_path):
-    """Tạo ảnh fallback: ảnh gốc + banner vàng ở dưới"""
-    out_name = f"fallback_{uuid.uuid4().hex}.jpg"
-    results_dir = os.path.join(current_app.static_folder, 'static', 'tryon_results')
-    os.makedirs(results_dir, exist_ok=True)
-    out_path = os.path.join(results_dir, out_name)
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-        img = Image.open(person_img_path).convert("RGB")
-        w, h = img.size
-        draw = ImageDraw.Draw(img)
-        # Use a default font
-        try:
-            # Typical Windows font paths or fallback to default
-            font = None
-            for font_path in ["arial.ttf", "C:\\Windows\\Fonts\\arial.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]:
-                try:
-                    font = ImageFont.truetype(font_path, 20)
-                    break
-                except: continue
-            if not font: font = ImageFont.load_default()
-        except IOError:
-            font = ImageFont.load_default()
-            
-        draw.rectangle([0, h - 44, w, h], fill=(255, 193, 7))
-        draw.text(
-            (10, h - 32),
-            "⚠  AI is busy — please try again later. Outfits below are still recommended!",
-            fill=(0, 0, 0),
-            font=font
-        )
-        img.save(out_path, "JPEG", quality=92)
-    except Exception:
-        shutil.copy(person_img_path, out_path)
-    return out_path
-
-def is_busy_error(exception):
-    """Checks if the exception is due to server busy/overloaded."""
-    err_msg = str(exception).lower()
-    if "busy" in err_msg or "queue" in err_msg or "overloaded" in err_msg:
-        return True
-    # HTTP errors if applicable
-    if hasattr(exception, 'status_code') and exception.status_code in [429, 503]:
-        return True
-    return False
-
-_cached_fashn_client = None
-
-def _get_fashn_client(space_id, hf_token):
-    global _cached_fashn_client
-    if _cached_fashn_client is None:
-        try:
-            from gradio_client import Client
-            print(f"[FASHN-VTON] Initializing Cached Gradio Client for {space_id}...")
-            try:
-                _cached_fashn_client = Client(space_id, hf_token=hf_token) if hf_token else Client(space_id)
-            except TypeError:
-                try:
-                    _cached_fashn_client = Client(space_id, token=hf_token) if hf_token else Client(space_id)
-                except TypeError:
-                    print(f"[FASHN-VTON] Warning: Could not pass token to Client, trying without token")
-                    _cached_fashn_client = Client(space_id)
-        except Exception as e:
-            print(f"[FASHN-VTON] Failed to initialize client: {e}")
-            raise
-    return _cached_fashn_client
-
-@retry(
-    stop=stop_after_attempt(2),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception(is_busy_error),
-    reraise=True # Important to let the caller handle it if all retries fail
-)
-def call_fashn_vton_raw(person_path, garment_path, fashn_cat, photo_type, space_id, hf_token):
-    try:
-        from gradio_client import handle_file as _hf
-    except ImportError:
-        try:
-            from gradio_client import file as _hf
-        except ImportError:
-            raise ImportError("gradio_client not installed")
-
-    client = _get_fashn_client(space_id, hf_token)
-
-    person_file = _hf(person_path)
-    garment_file = _hf(garment_path)
-    
-    # Fashn VTON 1.5 parameters
-    # category: "tops", "bottoms", "one-pieces"
-    # garment_photo_type: "model", "flat-lay"
-    
-    endpoints_to_try = ["/try_on", "/run", "/predict", "/infer"]
-
-    last_err = None
-    for ep in endpoints_to_try:
-        try:
-            print(f"[FASHN-VTON] Gửi request Fashn ({fashn_cat}, {photo_type}) vào {ep}...")
-            # Cấu hình tham số cho Fashn VTON 1.5 mới nhất
-            if ep == "/try_on":
-                result = client.predict(
-                    person_image=person_file,
-                    garment_image=garment_file,
-                    category=fashn_cat,
-                    garment_photo_type=photo_type,
-                    num_timesteps=50,
-                    guidance_scale=2.0,
-                    seed=42,
-                    segmentation_free=True,
-                    api_name=ep,
-                )
-            else:
-                result = client.predict(
-                    person_image=person_file,
-                    garment_image=garment_file,
-                    category=fashn_cat,
-                    garment_photo_type=photo_type,
-                    api_name=ep,
-                )
-            print(f"[FASHN-VTON] ✅ {ep} SUCCESS")
-            return result
-        except Exception as e:
-            with open("c:/Mai/4/debug_api.txt", "a", encoding="utf-8") as fd:
-                fd.write(f"Named params on {ep} failed: {type(e).__name__} {e}\n")
-            last_err = e
-            # Try positional if named fails
-            try:
-                if ep == "/try_on":
-                    result = client.predict(
-                        person_file,
-                        garment_file,
-                        fashn_cat,
-                        photo_type,
-                        50,    # num_timesteps
-                        2.0,   # guidance_scale
-                        42,    # seed
-                        True,  # segmentation_free
-                        api_name=ep,
-                    )
-                else:
-                    result = client.predict(
-                        person_file,
-                        garment_file,
-                        fashn_cat,
-                        photo_type,
-                        api_name=ep,
-                    )
-                print(f"[FASHN-VTON] ✅ positional endpoint {ep} SUCCESS")
-                return result
-            except Exception as e2:
-                with open("c:/Mai/4/debug_api.txt", "a", encoding="utf-8") as fd:
-                    fd.write(f"Positional params on {ep} failed: {type(e2).__name__} {e2}\n")
-                last_err = e2
-                continue
-
-    raise last_err or RuntimeError("All FASHN VTON endpoints failed on execution")
-
-def call_fashn_vton(person_path, garment_path, category="tops", photo_type="model"):
-    """
-    Calls FASHN VTON v1.5 on Hugging Face.
-    category in ["tops", "bottoms", "one-pieces"]
-    photo_type in ["model", "flat-lay"]
-    Returns (local_result_path, is_fallback)
-    """
-    try:
-        from gradio_client import Client
-    except ImportError:
-        print("[FASHN-VTON] gradio_client missing")
-        return person_path, True
-
-    space_id = "fashn-ai/fashn-vton-1.5"
-    hf_token = os.getenv("HF_TOKEN", "")
-    
-    # Normalize category for FASHN
-    cat_map = {
-        "tops": "tops", "top": "tops", "shirt": "tops", "ao": "tops",
-        "bottoms": "bottoms", "bottom": "bottoms", "pants": "bottoms", "quan": "bottoms",
-        "one-pieces": "one-pieces", "dress": "one-pieces", "vay": "one-pieces"
-    }
-    fashn_cat = cat_map.get(str(category).lower(), "tops")
-    
-    # Normalize photo_type
-    fashn_photo_type = "model"
-    if str(photo_type).lower() in ["flat-lay", "flat", "product"]:
-        fashn_photo_type = "flat-lay"
-
-    try:
-        result = call_fashn_vton_raw(person_path, garment_path, fashn_cat, fashn_photo_type, space_id, hf_token)
-        print(f"[FASHN-VTON] Raw result type: {type(result)}, value: {str(result)[:300]}")
-
-        # Extract the output image path from the result
-        result_path = None
-        if isinstance(result, (list, tuple)) and len(result) > 0:
-            item = result[0]
-            if isinstance(item, dict):
-                result_path = item.get("path") or item.get("url") or item.get("value")
-            elif isinstance(item, str):
-                result_path = item
-        elif isinstance(result, dict):
-            result_path = result.get("path") or result.get("url") or result.get("value")
-        elif isinstance(result, str):
-            result_path = result
-
-        if not result_path or not os.path.exists(str(result_path)):
-            print(f"[FASHN-VTON] Result path invalid or not found: {result_path}")
-            return person_path, True
-
-        # Copy to the same folder as person image so the worker can handle it
-        ext = os.path.splitext(str(result_path))[1] or ".png"
-        out_name = f"fashn_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        shutil.copy(str(result_path), out_path)
-        
-        print(f"[FASHN-VTON] SUCCESS -> {out_path}")
-        return out_path, False, None
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        err_msg = f"{type(e).__name__}: {str(e)}"
-        print(f"[FASHN-VTON] FAIL: {err_msg}")
-        # Trả về đường dẫn gốc, cờ fallback, và thông báo lỗi
-        return person_path, True, err_msg
-
-
-def _get_image_similarity(path1, path2):
-    """Simple check if two images are the same (pixel-wise or hash)"""
-    try:
-        from PIL import Image
-        import numpy as np
-        img1 = Image.open(path1).convert("L").resize((64, 64))
-        img2 = Image.open(path2).convert("L").resize((64, 64))
-        arr1 = np.array(img1).astype(float) / 255.0
-        arr2 = np.array(img2).astype(float) / 255.0
-        # Mean absolute difference
-        diff = np.mean(np.abs(arr1 - arr2))
-        # If diff < 0.05, they are > 95% similar
-        return 1.0 - diff
-    except Exception:
-        return 0.0
-
-@retry(
-    stop=stop_after_attempt(2),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception(is_busy_error),
-    reraise=True
-)
-def call_idm_vton_raw(client, person_path, garment_path, api_name=None):
-    try:
-        from gradio_client import handle_file as file_helper
-    except ImportError:
-        from gradio_client import file as file_helper
-        
-    if api_name:
-        return client.predict(
-            dict={"background": file_helper(person_path), "layers": [], "composite": None},
-            garm_img=file_helper(garment_path),
-            garment_des="",
-            is_checked=True,
-            is_checked_crop=False,
-            denoise_steps=30,
-            seed=42,
-            api_name=api_name,
-        )
-    else:
-        return client.predict(
-            dict={"background": file_helper(person_path), "layers": [], "composite": None},
-            garm_img=file_helper(garment_path),
-            garment_des="",
-            is_checked=True,
-            is_checked_crop=False,
-            denoise_steps=30,
-            seed=42,
-        )
-
-def call_idm_vton(person_path, garment_path):
-    """
-    Calls IDM-VTON on Hugging Face Space to perform virtual try-on.
-    Returns (local_path, is_fallback).
-    """
-    try:
-        try:
-            from gradio_client import Client, handle_file
-        except ImportError:
-            from gradio_client import Client, file
-    except ImportError:
-        print("[IDM-VTON] gradio_client not installed -> fallback")
-        return _make_fallback(person_path), True
-
-    spaces = [
-        "yisol/IDM-VTON",
-        "freddyaboulton/IDM-VTON",
-        "adi1516/IDM_VTON",
-    ]
-
-    hf_token = os.getenv("HF_TOKEN", "")
-    results_dir = os.path.join(current_app.static_folder, "static", "tryon_results")
-    os.makedirs(results_dir, exist_ok=True)
-
-    # Try common api names; spaces sometimes change endpoints.
-    api_names = ["/tryon", "/run/predict", None]
-
-    for space_id in spaces:
-        for api_name in api_names:
-            try:
-                print(f"[IDM-VTON] Trying {space_id} (api_name={api_name})...")
-                _wake_space(space_id)
-
-                # gradio_client expects `hf_token` (older code used `token`)
-                try:
-                    client = Client(space_id, hf_token=hf_token) if hf_token else Client(space_id)
-                except TypeError:
-                    try:
-                        client = Client(space_id, token=hf_token) if hf_token else Client(space_id)
-                    except TypeError:
-                        print(f"[IDM-VTON] Warning: Could not pass token to Client, trying without token")
-                        client = Client(space_id)
-
-                result = call_idm_vton_raw(client, person_path, garment_path, api_name=api_name)
-
-                result_raw = result[0] if isinstance(result, (list, tuple)) else result
-                if isinstance(result_raw, dict):
-                    result_raw = (
-                        result_raw.get("url")
-                        or result_raw.get("path")
-                        or result_raw.get("value")
-                        or str(result_raw)
-                    )
-
-                ext = os.path.splitext(str(result_raw))[1] or ".jpg"
-                out_name = f"result_{uuid.uuid4().hex}{ext}"
-                out_path = os.path.join(results_dir, out_name)
-                shutil.copy(str(result_raw), out_path)
-
-                print(f"[IDM-VTON] SUCCESS {space_id} -> {out_path}")
-                return out_path, False
-
-            except Exception as e:
-                print(f"[IDM-VTON] FAIL {space_id} (api_name={api_name}): {type(e).__name__}: {str(e)[:200]}")
-                time.sleep(2)
-                continue
-
-    print("[IDM-VTON] All spaces failed -> fallback")
-    return _make_fallback(person_path), True
+# HF/Gradio VTON functions removed. Using Local API via call_my_vton_api.
 
 def download_garment_image(image_url: str, shopee_url: str, save_dir: str = None):
     """
@@ -955,44 +568,7 @@ def map_to_canonical_clothing(ai_category: str, item_type_raw: str, shopee_cat: 
 
     return None, None
 
-def infer_canonical_category_by_name(name: str) -> tuple[str, str]:
-    n = _norm_ascii(name)
-    # Heuristic keywords
-    # Ưu tiên Đầm/Váy (không phải chân váy)
-    if any(k in n for k in ["dam", "dress", "vay lien", "jumpsuit", "vay body", "vay tre vai", "vay kieu", "vay xoe"]):
-        if "chan vay" not in n:
-            return "one-pieces", "dress"
-            
-    # Chân váy / Quần
-    if any(k in n for k in ["chan vay", "skirt"]):
-        return "bottoms", "skirt"
-    if any(k in n for k in ["jean", "denim"]):
-        return "bottoms", "jeans"
-    if any(k in n for k in ["quan tay", "trouser", "quan au", "quan dai", "quan baggy", "quan ong suong", "quan jogger"]):
-        return "bottoms", "trousers"
-    if any(k in n for k in ["short", "quan dui", "shorts"]):
-        return "bottoms", "shorts"
-    if "quan" in n:
-        return "bottoms", "trousers"
-
-    # Áo
-    if any(k in n for k in ["croptop", "crop top", "crop", "ao ho eo", "baby tee"]):
-        return "tops", "crop_top"
-    if any(k in n for k in ["tshirt", "t-shirt", "tee", "ao thun", "ao phong", "ao canh"]):
-        return "tops", "t_shirt"
-    if "so mi" in n or "shirt" in n or "ao kieu" in n:
-        return "tops", "shirt"
-    if any(k in n for k in ["hoodie", "sweater", "ao len", "cardigan"]):
-        return "tops", "sweater"
-    if any(k in n for k in ["khoac", "jacket", "blazer", "coat", "gi le"]):
-        return "tops", "jacket"
-    
-    # Nếu có "vay" mà không phải "chan vay"
-    if "vay" in n and "chan vay" not in n:
-        return "one-pieces", "dress"
-        
-    # Default safe
-    return "tops", "t_shirt"
+# Removed duplicated helper functions - now imported from .utils
 
 def validate_and_fix_category(name: str, category: str, sub_category: str = "") -> tuple[str, str]:
     """
@@ -1022,13 +598,7 @@ def _norm_text(s: str, max_len: int | None = None) -> str:
         return t[:max_len]
     return t
 
-def _norm_ascii(s: str) -> str:
-    try:
-        import unicodedata
-        s2 = unicodedata.normalize("NFD", s or "").encode("ascii", "ignore").decode("ascii")
-        return " ".join(s2.lower().split())
-    except Exception:
-        return " ".join((s or "").lower().split())
+# Removed duplicated helper functions - now imported from .utils
 
 def _parse_vnd_price(val) -> int:
     try:
@@ -3252,7 +2822,7 @@ def _resolve_clean_abs(clean_rel, static_folder_path):
     except: pass
     return None
 
-def call_my_vton_api(person_path, garment_path, category):
+def call_my_vton_api(person_path, garment_path, category, garment_photo_type="model"):
     import base64
     import uuid
     import os
@@ -3260,70 +2830,116 @@ def call_my_vton_api(person_path, garment_path, category):
     import time
     
     # URL Colab của bạn - Đảm bảo URL này là mới nhất từ Colab ngrok
-    url = 'https://toi-vapid-preinsinuatingly.ngrok-free.dev/try_on'
-    
-    # Header quan trọng để bypass cảnh báo của ngrok
-    headers = { 
-        "ngrok-skip-browser-warning": "true",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+    url = os.getenv("VTON_API_URL", "https://toi-vapid-preinsinuatingly.ngrok-free.dev/try_on")
+    print(f"[MY-VTON] Calling API URL (Remote): {url}")
     
     start_time = time.time()
     try:
         print(f"[MY-VTON] Đang đọc file: {os.path.basename(person_path)} & {os.path.basename(garment_path)}")
+        print("Category nhận được:", category)
         with open(person_path, 'rb') as f: person_bytes = f.read()
         with open(garment_path, 'rb') as f: garment_bytes = f.read()
         
+        # Chuẩn hóa garment_photo_type
+        gpt = "model"
+        if garment_photo_type and str(garment_photo_type).lower() in ["flat-lay", "flat_lay", "product", "flat"]:
+            gpt = "flat-lay"
+
         # FASHN VTON 1.5 Parameters
         files = {
             'person_image': ('person.png', person_bytes, 'image/png'),
             'garment_image': ('garment.png', garment_bytes, 'image/png'),
-            'category': (None, category),
-            'num_timesteps': (None, '30'),
-            'guidance_scale': (None, '2.0'), # Tăng guidance_scale một chút để kết quả rõ hơn
-            'seed': (None, '42'),
-            'segmentation_free': (None, 'true')
+        }
+        # Một số API FastAPI yêu cầu Form (data), một số yêu cầu Query (params)
+        # Chúng ta sẽ gửi qua cả hai để đảm bảo độ tương thích
+        payload = {
+            'category': category or 'tops',
+            'garment_photo_type': gpt,
+            'num_timesteps': '30',
+            'guidance_scale': '2.0',
+            'seed': '42',
+            'segmentation_free': 'true'
         }
         
-        # Tăng timeout lên 300 giây (5 phút) vì model xử lý nặng
-        print(f"[MY-VTON] Đang gọi API Colab ({category})... Vui lòng đợi (Timeout 300s)")
-        response = requests.post(url, files=files, headers=headers, timeout=300)
+        # Gọi API (Ngrok hoặc Local)
+        print(f"[MY-VTON] Đang gọi API ({category}) tại {url}... (Đợi vô hạn thời gian)")
+        headers = {
+            'ngrok-skip-browser-warning': 'true',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        # Gửi payload qua cả params (Query) và data (Form)
+        response = requests.post(url, files=files, data=payload, params=payload, headers=headers, timeout=None)
         
         duration = time.time() - start_time
         print(f"[MY-VTON] API phản hồi sau {duration:.1f}s | Status: {response.status_code}")
 
         if response.status_code != 200:
-            err_msg = response.text[:200]
+            err_msg = response.text[:500]
             print(f"[MY-VTON] ❌ Lỗi API (HTTP {response.status_code}): {err_msg}")
             return person_path, True, f'API error ({response.status_code}): {err_msg}'
             
-        data = response.json()
-        result_b64 = data.get('result', '')
+        # Kiểm tra content-type để biết là ảnh raw hay JSON
+        content_type = response.headers.get("Content-Type", "").lower()
         
-        if not result_b64:
-            print("[MY-VTON] ❌ API trả về thành công nhưng thiếu trường 'result'")
-            return person_path, True, 'No result in API response'
-            
-        # Giải mã và lưu ảnh kết quả
         ext = os.path.splitext(person_path)[1] or ".png"
         out_name = f"my_vton_{uuid.uuid4().hex}{ext}"
         out_path = os.path.join(os.path.dirname(person_path), out_name)
         
-        img_data = base64.b64decode(result_b64)
-        with open(out_path, "wb") as f:
-            f.write(img_data)
+        if "image" in content_type:
+            # API trả về thẳng file ảnh
+            with open(out_path, "wb") as f:
+                f.write(response.content)
+            img_size_kb = len(response.content) // 1024
+        else:
+            # API trả về JSON chứa base64
+            try:
+                data_json = response.json()
+            except Exception as e:
+                print(f"[MY-VTON] ❌ Không thể đọc JSON từ response: {response.text[:200]}")
+                return person_path, True, f"Invalid response format: {response.text[:100]}"
+                
+            # Thử tất cả các key phổ biến chứa kết quả ảnh
+            result_b64 = None
+            for key in ['result', 'image', 'image_base64', 'output', 'images']:
+                val = data_json.get(key)
+                if val:
+                    if isinstance(val, list) and len(val) > 0:
+                        result_b64 = val[0]
+                    else:
+                        result_b64 = val
+                    break
             
-        print(f"[MY-VTON] ✅ Thành công! Đã lưu ảnh: {out_path} ({len(img_data)//1024} KB)")
+            if not result_b64:
+                print(f"[MY-VTON] ❌ API trả về JSON nhưng không tìm thấy trường chứa ảnh. Keys: {list(data_json.keys())}")
+                return person_path, True, 'No result field in API JSON response'
+                
+            try:
+                # Một số API trả về dạng "data:image/png;base64,..."
+                if isinstance(result_b64, str) and "," in result_b64:
+                    result_b64 = result_b64.split(",")[1]
+                
+                img_data = base64.b64decode(result_b64)
+                with open(out_path, "wb") as f:
+                    f.write(img_data)
+                img_size_kb = len(img_data) // 1024
+            except Exception as e:
+                print(f"[MY-VTON] ❌ Lỗi giải mã base64: {str(e)}")
+                return person_path, True, f"Base64 decode error: {str(e)}"
+            
+        print(f"[MY-VTON] ✅ Thành công! Đã lưu ảnh: {out_path} ({img_size_kb} KB)")
         return out_path, False, None
 
     except requests.exceptions.Timeout:
-        print(f"[MY-VTON] ❌ Timeout sau 300s! AI có thể đang quá tải hoặc GPU Colab bị treo.")
-        return person_path, True, 'API Timeout (300s) - AI is busy'
+        print(f"[MY-VTON] ❌ Timeout! API có thể đang quá tải hoặc treo.")
+        return person_path, True, 'Lỗi Timeout - Hệ thống AI đang quá tải, vui lòng thử lại sau.'
+    except requests.exceptions.ConnectionError:
+        print(f"[MY-VTON] ❌ ConnectionError: Không thể kết nối tới {url}. Có thể ngrok/máy chủ đã tắt.")
+        return person_path, True, 'Lỗi kết nối máy chủ AI VTON. Xin hãy kiểm tra lại ngrok URL trong .env hoặc bật Local Server!'
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(f"[MY-VTON] ❌ Lỗi không xác định: {str(e)}")
-        return person_path, True, str(e)
+        return person_path, True, f"Lỗi không xác định: {str(e)}"
 
 def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folder_path):
     import time
@@ -3348,16 +2964,7 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
         
         # Mapping FASHN cat: Ưu tiên check cả Name nếu Category bị gán nhãn sai
         tag_search = (str(db_cat) + " " + str(name)).lower()
-        
-        # 1. Ưu tiên cao nhất cho Đầm/Váy liền
-        if any(k in tag_search for k in ["dress", "one-piece", "váy liền", "đầm", "vay lien", "dam"]): 
-            fashn_cat = "one-pieces"
-        # 2. Tiếp theo là Quần/Chân váy
-        elif any(k in tag_search for k in ["bottom", "quan", "quần", "skirt", "trouser", "jean", "short", "chân váy", "chan vay"]): 
-            fashn_cat = "bottoms"
-        # 3. Còn lại là Áo
-        else:
-            fashn_cat = "tops"
+        fashn_cat = map_category_to_fashn(tag_search)
         
         print(f"[TRYON] Đang xử lý: {name} ({fashn_cat}, {photo_type})")
         
@@ -3368,7 +2975,7 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
             
         if g_abs and os.path.exists(g_abs):
             try:
-                res_path, fb, err = call_my_vton_api(person_path, g_abs, category=fashn_cat)
+                res_path, fb, err = call_my_vton_api(person_path, g_abs, category=fashn_cat, garment_photo_type=photo_type)
                 if not fb:
                     person_path = res_path
                     final_path = res_path

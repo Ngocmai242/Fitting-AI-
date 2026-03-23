@@ -43,6 +43,10 @@ echo ---------------------------------------------------
 :: We use 127.0.0.1 explicitly to avoid 'localhost' IPv6 issues
 start "" cmd /c "timeout /t 5 >nul && start http://127.0.0.1:8080/admin_login.html"
 
+:: Start VITON-HD Local API
+echo [5] STARTING LOCAL VITON-HD API...
+start "VITON-HD Local API" cmd /c "cd VITON-HD && python api.py"
+
 :: Run Python in THIS window with Auto-Restart Loop
 cd backend
 

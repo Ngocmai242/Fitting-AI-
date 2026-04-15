@@ -1,0 +1,110 @@
+{
+  "Female": {
+    "Pear": {
+      "name_vi": "Dáng Quả Lê",
+      "description": "Phần hông và đùi lớn hơn đáng kể so với phần vai và ngực.",
+      "Work": {
+        "top": {"preferred_fit": ["Regular fit"], "color_tone": ["Bright", "Light"]},
+        "bottom": {"preferred_fit": ["Ống rộng", "Suông", "Chữ A"], "color_tone": ["Dark", "Neutral"], "avoid_fit": ["Slim fit", "Skinny"]}
+      },
+      "Party": {
+        "top": {"preferred_fit": ["Regular fit", "Bồng"], "color_tone": ["Bright", "Warm", "Cool"]},
+        "bottom": {"preferred_fit": ["Chữ A"], "color_tone": ["Dark", "Neutral"], "avoid_fit": ["Skinny"]}
+      },
+      "Daily wear": {
+        "top": {"preferred_fit": ["Regular fit", "Oversized"], "color_tone": ["Any"]},
+        "bottom": {"preferred_fit": ["Suông", "Baggy"], "color_tone": ["Neutral"], "avoid_fit": ["Skinny"]}
+      }
+    },
+    "Apple": {
+      "name_vi": "Dáng Quả Táo",
+      "description": "Vòng eo lớn hơn vòng hông và vai. Chiều dài chân thường thon thả.",
+      "Work": {
+        "top": {"preferred_fit": ["Suông", "Chữ A"], "color_tone": ["Neutral", "Dark"]},
+        "bottom": {"preferred_fit": ["Slim fit", "Suông"], "color_tone": ["Any"]}
+      },
+      "Party": {
+        "top": {"preferred_fit": ["Cổ chữ V", "Suông rộng"], "color_tone": ["Neutral"]},
+        "bottom": {"preferred_fit": ["Slim fit"], "color_tone": ["Any"]}
+      },
+      "Daily wear": {
+        "top": {"preferred_fit": ["Oversized", "Suông"], "color_tone": ["Any"]},
+        "bottom": {"preferred_fit": ["Regular fit", "Ngắn"], "color_tone": ["Any"]}
+      }
+    },
+    "Hourglass": {
+      "name_vi": "Dáng Đồng Hồ Cát",
+      "description": "Vòng eo thon gọn, tỷ lệ ngực và hông cân đối.",
+      "Work": {
+        "top": {"preferred_fit": ["Slim fit", "Regular fit"], "color_tone": ["Neutral"]},
+        "bottom": {"preferred_fit": ["Slim fit", "Bút chì", "Ống loe"], "color_tone": ["Neutral"]}
+      },
+      "Party": {
+        "top": {"preferred_fit": ["Slim fit", "Tôn dáng"], "color_tone": ["Bright", "Warm", "Cool"]},
+        "bottom": {"preferred_fit": ["Slim fit", "Chữ A"], "color_tone": ["Bright", "Warm", "Cool"]}
+      },
+      "Daily wear": {
+        "top": {"preferred_fit": ["Slim fit", "Regular fit"], "color_tone": ["Any"], "avoid_fit": ["Oversized"]},
+        "bottom": {"preferred_fit": ["Slim fit", "Suông"], "color_tone": ["Any"], "avoid_fit": ["Oversized"]}
+      }
+    },
+    "Rectangle": {
+      "name_vi": "Dáng Chữ Nhật",
+      "description": "Số đo ba vòng vai, eo, hông gần như tương đương nhau.",
+      "Work": {
+        "top": {"preferred_fit": ["Regular fit", "Có thắt eo"], "color_tone": ["Light"]},
+        "bottom": {"preferred_fit": ["Suông", "Xếp ly"], "color_tone": ["Dark", "Neutral"]}
+      },
+      "Party": {
+        "top": {"preferred_fit": ["Bèo nhún", "Có thắt eo"], "color_tone": ["Bright"]},
+        "bottom": {"preferred_fit": ["Xòe", "Chữ A"], "color_tone": ["Any"]}
+      },
+      "Daily wear": {
+        "top": {"preferred_fit": ["Regular fit"], "color_tone": ["Any"]},
+        "bottom": {"preferred_fit": ["Jogger", "Baggy", "Suông"], "color_tone": ["Any"]}
+      }
+    },
+    "Inverted Triangle": {
+      "name_vi": "Dáng Tam Giác Ngược",
+      "description": "Vai rộng và ngực lớn, phần hông và eo hẹp hơn.",
+      "Work": {
+        "top": {"preferred_fit": ["Regular fit", "Cổ chữ V"], "color_tone": ["Dark", "Neutral"]},
+        "bottom": {"preferred_fit": ["Ống rộng", "Xếp ly"], "color_tone": ["Bright", "Light"]}
+      },
+      "Party": {
+        "top": {"preferred_fit": ["Cổ vuông", "Cổ khoét sâu"], "color_tone": ["Dark"]},
+        "bottom": {"preferred_fit": ["Chữ A xòe", "Xếp tà"], "color_tone": ["Bright", "Warm"]}
+      },
+      "Daily wear": {
+        "top": {"preferred_fit": ["Regular fit"], "color_tone": ["Neutral", "Dark"], "avoid_fit": ["Độn vai"]},
+        "bottom": {"preferred_fit": ["Oversized", "Baggy"], "color_tone": ["Any"]}
+      }
+    }
+  },
+  "Male": {
+    "Ectomorph": {
+      "name_vi": "Dáng Người Mảnh Khảnh",
+      "description": "Gầy, ít mỡ, cơ bắp nhỏ.",
+      "Daily wear": {
+        "top": {"preferred_fit": ["Regular fit", "Nhiều lớp (Layering)"], "color_tone": ["Light", "Bright"]},
+        "bottom": {"preferred_fit": ["Regular fit", "Straight"], "avoid_fit": ["Skinny"]}
+      }
+    },
+    "Mesomorph": {
+      "name_vi": "Dáng Người Thể Thao",
+      "description": "Cơ bắp phát triển, tỷ lệ ngực - vai rộng, eo thon.",
+      "Daily wear": {
+        "top": {"preferred_fit": ["Slim fit", "Regular fit"], "color_tone": ["Any"]},
+        "bottom": {"preferred_fit": ["Regular fit", "Slim fit"]}
+      }
+    },
+    "Endomorph": {
+      "name_vi": "Dáng Người Đậm",
+      "description": "Cơ thể tròn trịa, tỷ lệ mỡ cao hơn.",
+      "Daily wear": {
+        "top": {"preferred_fit": ["Regular fit", "Cổ chữ V"], "color_tone": ["Dark", "Neutral", "Cool"], "avoid_fit": ["Oversized xòe"]},
+        "bottom": {"preferred_fit": ["Straight", "Suông"], "color_tone": ["Dark"]}
+      }
+    }
+  }
+}

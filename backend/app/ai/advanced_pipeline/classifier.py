@@ -3,6 +3,7 @@ import torch.nn as nn
 from PIL import Image
 import torchvision.transforms as T
 import timm
+import os
 
 class BodyShapeClassifier(nn.Module):
     """

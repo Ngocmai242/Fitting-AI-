@@ -48,4 +48,5 @@ frontend/static/normalized_selected/*
 *.pt
 *.pth
 *.bin
+*.pkl
 .env

@@ -13,3 +13,5 @@ bitsandbytes
 safetensors
 pillow
 pyyaml
+sentence-transformers
+scikit-learn

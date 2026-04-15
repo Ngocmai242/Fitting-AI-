@@ -42,5 +42,13 @@
   "Style Dazzle.vn": {
     "shop_name": "Style Dazzle.vn",
     "shop_url": "https://shopee.vn/18675729059.vn?categoryId=100017&entryPoint=ShopByPDP&itemId=25766752700"
+  },
+  "LODES CLUB": {
+    "shop_name": "LODES CLUB",
+    "shop_url": "https://shopee.vn/lodesclub?categoryId=100011&entryPoint=ShopByPDP&itemId=24080381308&upstream=ymal"
+  },
+  "SILAS STUDIO": {
+    "shop_name": "SILAS STUDIO",
+    "shop_url": "https://shopee.vn/silas_studio?categoryId=100011&entryPoint=ShopByPDP&itemId=44023286792&upstream=search"
   }
 }

@@ -22,7 +22,7 @@ class FashionPipeline:
         if not self.classifier:
             self.classifier = ClassifierEngine(model_path=os.path.join(MODEL_DIR, 'efficientnet_body.pth'))
         if not self.llm:
-            self.llm = FashionLLM(model_id="google/gemma-3-4b-it")
+            self.llm = FashionLLM(model_id="llama3.2:3b")
 
 pipeline = FashionPipeline()
 

@@ -3230,8 +3230,9 @@ def recommend_products_api():
             results = [{"type": "single", "items": [t]} for t in tops]
 
         elif outfit_type == 'bottom':
-            # Chỉ lấy quần/chân váy
-            bottoms = [p for p in valid_products if any(k in (str(p.get("garment_type") or "") + " " + str(p.get("name") or "")).lower() for k in ["bottom", "quan", "quần", "pants", "short", "jeans", "trouser", "skirt", "chân váy"])]
+            # Chỉ lấy quần/chân váy và tuyệt đối LOẠI BỎ áo (fix bug áo hiện trong mục quần)
+            raw_bottoms = [p for p in valid_products if any(k in (str(p.get("garment_type") or "") + " " + str(p.get("name") or "")).lower() for k in ["bottom", "quan", "quần", "pants", "short", "jeans", "trouser", "skirt", "chân váy"])]
+            bottoms = [p for p in raw_bottoms if not any(k in (str(p.get("garment_type") or "") + " " + str(p.get("name") or "")).lower() for k in ["top", "ao", "áo", "shirt", "t-shirt", "vest", "khoác"])]
             results = [{"type": "single", "items": [b]} for b in bottoms]
 
         elif outfit_type == 'top_bottom':

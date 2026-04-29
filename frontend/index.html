@@ -231,7 +231,7 @@
                             shapes.</p>
                         <div class="control-stack" style="margin-top:1rem; display:flex; flex-direction:column; gap:12px; align-items:center;">
                             <div style="display:flex; flex-direction:column; align-items:center; gap:15px; width:100%; max-width:400px; margin: 0 auto 20px;">
-                                <div id="analysis-dropzone" onclick="document.getElementById('body-image').click()" 
+                                <div id="analysis-dropzone" onclick="const fi = document.getElementById('body-image'); fi.value = ''; fi.click()" 
                                      style="border: 2px dashed var(--pastel-blue); border-radius: 12px; width: 100%; height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #f0f7ff; cursor: pointer; transition: 0.3s; position: relative; overflow: hidden; border-color: var(--pastel-blue-dark);">
                                     <div id="analysis-upload-prompt" style="text-align: center;">
                                         <i class="fas fa-user-check" style="font-size: 2.5rem; color: var(--pastel-blue-dark); margin-bottom: 0.8rem;"></i>

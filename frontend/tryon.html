@@ -110,15 +110,20 @@
             display: none;
             position: relative;
             width: 100%;
-            max-height: 400px;
+            background: #f9f9f9;
+            text-align: center;
             border-radius: var(--radius);
             overflow: hidden;
         }
 
         #preview-img {
-            width: 100%;
-            height: 100%;
+            max-width: 100%;
+            max-height: 500px; /* Hiển thị toàn thân mà không vượt khung */
+            width: auto;
+            height: auto;
             object-fit: contain;
+            display: block;
+            margin: 0 auto;
         }
 
         .remove-preview {
@@ -322,9 +327,13 @@
                     <h3>Step 1: Upload Your Photo</h3>
                 </div>
                 
-                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+                <div class="upload-zone" id="upload-zone" 
+                     onclick="const fi = document.getElementById('file-input'); fi.value = ''; fi.click()"
+                     ondragover="handleDragOver(event)" 
+                     ondrop="handleDrop(event)"
+                     ondragleave="handleDragLeave(event)">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <p>Click to select an image or drag and drop here</p>
+                    <p id="upload-text">Click to select an image or drag and drop here</p>
                     <small>JPG, PNG or WEBP (Max 10MB)</small>
                 </div>
 
@@ -464,48 +473,101 @@
         async function handleFileSelect(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
-                if (file.size > 10 * 1024 * 1024) {
-                    showToast('File is too large! Please choose an image under 10MB.', 'error');
-                    return;
-                }
-                selectedFile = file;
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('preview-img').src = e.target.result;
-                    document.getElementById('upload-zone').style.display = 'none';
-                    document.getElementById('preview-container').style.display = 'block';
-                }
-                reader.readAsDataURL(file);
-
-                // --- Phase 1: Automatically upload person photo after selection ---
-                await uploadPerson(file);
+                await processSelectedFile(file);
             }
         }
 
-        async function uploadPerson(file) {
-            isUploadingPerson = true;
-            showToast('Uploading your photo to server...', 'success');
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('upload-zone').style.borderColor = 'var(--rose)';
+            document.getElementById('upload-zone').style.background = 'white';
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('upload-zone').style.borderColor = 'var(--border)';
+            document.getElementById('upload-zone').style.background = 'var(--rose-pale)';
+        }
+
+        async function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('upload-zone').style.borderColor = 'var(--border)';
+            document.getElementById('upload-zone').style.background = 'var(--rose-pale)';
             
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                await processSelectedFile(file);
+            }
+        }
+
+        async function processSelectedFile(file) {
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('File is too large! Please choose an image under 10MB.', 'error');
+                return;
+            }
+            
+            selectedFile = file;
+            
+            // Show preview immediately
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('upload-zone').style.display = 'none';
+                document.getElementById('preview-container').style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+
+            // --- Phase 1: Automatically upload person photo after selection ---
+            // We use a small delay to ensure UI transition is smooth
+            // Upload to server immediately
+            uploadPerson(file);
+        }
+
+        async function uploadPerson(file) {
+            if (isUploadingPerson) return;
+            
+            isUploadingPerson = true;
+            currentPersonId = null; // Reset while uploading
+            showToast('Uploading photo to server...', 'info');
+            
+            // Add visual loading state
+            const previewOverlay = document.createElement('div');
+            previewOverlay.id = 'upload-loading-overlay';
+            previewOverlay.innerHTML = '<div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status"></div><p style="color:white; margin-top:15px; font-weight:600;">Saving to Server...</p>';
+            previewOverlay.style = "position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:15px; z-index:100;";
+            
+            const container = document.getElementById('preview-container');
+            if (container) {
+                container.style.position = 'relative';
+                container.appendChild(previewOverlay);
+            }
+
             const formData = new FormData();
             formData.append('photo', file);
 
             try {
-                const res = await fetch(`${API_BASE}/api/upload-person`, {
+                const response = await fetch(`${API_BASE}/api/upload-person`, {
                     method: 'POST',
                     body: formData
                 });
-                const data = await res.json();
+
+                const data = await response.json();
                 if (data.success) {
                     currentPersonId = data.person_id;
-                    showToast('Photo saved to server memory.', 'success');
+                    showToast('Photo saved successfully.', 'success');
                 } else {
                     showToast('Failed to save photo: ' + data.message, 'error');
                 }
-            } catch (err) {
-                console.error(err);
-                showToast('Server Connection Error! Please make sure the backend is running.', 'error');
+            } catch (error) {
+                console.error('Upload error:', error);
+                showToast('Network error during photo upload. Please check backend.', 'error');
             } finally {
                 isUploadingPerson = false;
+                const overlay = document.getElementById('upload-loading-overlay');
+                if (overlay) overlay.remove();
             }
         }
 
@@ -843,10 +905,9 @@
             }
         })();
 
-        // Drag & Drop & Click
+        // Drag & Drop
         const zone = document.getElementById('upload-zone');
-        zone.addEventListener('click', () => document.getElementById('file-input').click());
-        
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
             zone.addEventListener(evt, e => {
                 e.preventDefault();

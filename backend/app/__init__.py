@@ -114,9 +114,10 @@ def _ensure_tryon_schema(db_path: str) -> None:
 
 
 def create_app():
-    # Load env vars from project root `.env` (e.g. HF_TOKEN=...)
-    load_dotenv()
-
+    # Load env vars from backend/.env explicitly
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(base_dir, "..", ".env")
+    load_dotenv(dotenv_path=os.path.abspath(env_path), override=True)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     frontend_dir = os.path.join(base_dir, "..", "..", "frontend")
     frontend_dir = os.path.abspath(frontend_dir)

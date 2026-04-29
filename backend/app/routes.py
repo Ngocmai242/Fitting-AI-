@@ -2833,124 +2833,293 @@ def _resolve_clean_abs(clean_rel, static_folder_path):
         pass
     return None
 
-def call_my_vton_api(person_path, garment_path, category, garment_photo_type="model"):
-    import base64
-    import uuid
+def get_hf_client(space_name):
+    """Khởi tạo Gradio Client an toàn. Nếu không có Token hợp lệ, bỏ qua để tránh lỗi Quota."""
+    from gradio_client import Client
     import os
-    import requests
-    import time
-    
-    # URL Colab của bạn - Đảm bảo URL này là mới nhất từ Colab ngrok
-    url = os.getenv("VTON_API_URL", "https://toi-vapid-preinsinuatingly.ngrok-free.dev/try_on")
-    print(f"[MY-VTON] Calling API URL (Remote): {url}")
-    
-    start_time = time.time()
+    token = os.getenv("HF_TOKEN", "")
+    if not token or "your_" in token or "hf_" not in token:
+        return None # BẮT BUỘC PHẢI CÓ TOKEN CHO HUGGINGFACE ZEROGPU
     try:
-        print(f"[MY-VTON] Đang đọc file: {os.path.basename(person_path)} & {os.path.basename(garment_path)}")
-        print("Category nhận được:", category)
-        with open(person_path, 'rb') as f: person_bytes = f.read()
-        with open(garment_path, 'rb') as f: garment_bytes = f.read()
-        
-        # Chuẩn hóa garment_photo_type
-        gpt = "model"
-        if garment_photo_type and str(garment_photo_type).lower() in ["flat-lay", "flat_lay", "product", "flat"]:
-            gpt = "flat-lay"
-
-        # FASHN VTON 1.5 Parameters
-        files = {
-            'person_image': ('person.png', person_bytes, 'image/png'),
-            'garment_image': ('garment.png', garment_bytes, 'image/png'),
-        }
-        # Một số API FastAPI yêu cầu Form (data), một số yêu cầu Query (params)
-        # Chúng ta sẽ gửi qua cả hai để đảm bảo độ tương thích
-        payload = {
-            'category': category or 'tops',
-            'garment_photo_type': gpt,
-            'num_timesteps': '30',
-            'guidance_scale': '2.0',
-            'seed': '42',
-            'segmentation_free': 'true'
-        }
-        
-        # Gọi API (Ngrok hoặc Local)
-        print(f"[MY-VTON] Đang gọi API ({category}) tại {url}... (Đợi vô hạn thời gian)")
-        headers = {
-            'ngrok-skip-browser-warning': 'true',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        # Gửi payload qua cả params (Query) và data (Form)
-        response = requests.post(url, files=files, data=payload, params=payload, headers=headers, timeout=None)
-        
-        duration = time.time() - start_time
-        print(f"[MY-VTON] API phản hồi sau {duration:.1f}s | Status: {response.status_code}")
-
-        if response.status_code != 200:
-            err_msg = response.text[:500]
-            print(f"[MY-VTON] ❌ Lỗi API (HTTP {response.status_code}): {err_msg}")
-            return person_path, True, f'API error ({response.status_code}): {err_msg}'
-            
-        # Kiểm tra content-type để biết là ảnh raw hay JSON
-        content_type = response.headers.get("Content-Type", "").lower()
-        
-        ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"my_vton_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        
-        if "image" in content_type:
-            # API trả về thẳng file ảnh
-            with open(out_path, "wb") as f:
-                f.write(response.content)
-            img_size_kb = len(response.content) // 1024
-        else:
-            # API trả về JSON chứa base64
-            try:
-                data_json = response.json()
-            except Exception as e:
-                print(f"[MY-VTON] ❌ Không thể đọc JSON từ response: {response.text[:200]}")
-                return person_path, True, f"Invalid response format: {response.text[:100]}"
-                
-            # Thử tất cả các key phổ biến chứa kết quả ảnh
-            result_b64 = None
-            for key in ['result', 'image', 'image_base64', 'output', 'images']:
-                val = data_json.get(key)
-                if val:
-                    if isinstance(val, list) and len(val) > 0:
-                        result_b64 = val[0]
-                    else:
-                        result_b64 = val
-                    break
-            
-            if not result_b64:
-                print(f"[MY-VTON] ❌ API trả về JSON nhưng không tìm thấy trường chứa ảnh. Keys: {list(data_json.keys())}")
-                return person_path, True, 'No result field in API JSON response'
-                
-            try:
-                # Một số API trả về dạng "data:image/png;base64,..."
-                if isinstance(result_b64, str) and "," in result_b64:
-                    result_b64 = result_b64.split(",")[1]
-                
-                img_data = base64.b64decode(result_b64)
-                with open(out_path, "wb") as f:
-                    f.write(img_data)
-                img_size_kb = len(img_data) // 1024
-            except Exception as e:
-                print(f"[MY-VTON] ❌ Lỗi giải mã base64: {str(e)}")
-                return person_path, True, f"Base64 decode error: {str(e)}"
-            
-        print(f"[MY-VTON] ✅ Thành công! Đã lưu ảnh: {out_path} ({img_size_kb} KB)")
-        return out_path, False, None
-
-    except requests.exceptions.Timeout:
-        print(f"[MY-VTON] ❌ Timeout! API có thể đang quá tải hoặc treo.")
-        return person_path, True, 'Lỗi Timeout - Hệ thống AI đang quá tải, vui lòng thử lại sau.'
-    except requests.exceptions.ConnectionError:
-        print(f"[MY-VTON] ❌ ConnectionError: Không thể kết nối tới {url}. Có thể ngrok/máy chủ đã tắt.")
-        return person_path, True, 'Lỗi kết nối máy chủ AI VTON. Xin hãy kiểm tra lại ngrok URL trong .env hoặc bật Local Server!'
+        return Client(space_name, token=token)
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"[MY-VTON] ❌ Lỗi không xác định: {str(e)}")
-        return person_path, True, f"Lỗi không xác định: {str(e)}"
+        print(f"[HF-CLIENT] ❌ Không thể kết nối Space {space_name}: {e}")
+        return None
+
+def generate_garment_description_with_gemini(garment_path):
+    """Sử dụng Gemini 1.5 Flash để đọc đúng màu và mô tả sản phẩm, ép AI VTON không bị ảo giác màu."""
+    import os
+    try:
+        import google.generativeai as genai
+        from PIL import Image
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key or "your_" in api_key:
+            return ""
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        img = Image.open(garment_path).convert('RGB')
+        prompt = "Describe the exact color (e.g. deep navy, pastel pink), fabric texture, and MOST IMPORTANTLY any specific patterns (like plaid, checkered/caro, striped, floral, logos, or texts) of this clothing item in one concise English sentence for an AI renderer. Be highly detailed about patterns. Do not include the background."
+        response = model.generate_content([prompt, img])
+        description = response.text.strip().replace("\n", " ")
+        print(f"[GEMINI PROMPT INJECTOR] Garment Description: {description}")
+        return description
+    except Exception as e:
+        print(f"[GEMINI PROMPT INJECTOR] Error: {e}")
+        return ""
+
+def evaluate_vton_result_with_gemini(person_path, garment_path, result_path):
+    """
+    Sử dụng Gemini Vision để kiểm tra ảnh kết quả Virtual Try-On.
+    Phát hiện biến dạng người (mất tay, mất chân) hoặc biến dạng sản phẩm.
+    """
+    import os
+    try:
+        import google.generativeai as genai
+        from PIL import Image
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key or "your_" in api_key:
+            return True # Không có key thì bỏ qua kiểm tra
+            
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        
+        p_img = Image.open(person_path).convert('RGB')
+        g_img = Image.open(garment_path).convert('RGB')
+        r_img = Image.open(result_path).convert('RGB')
+        
+        prompt = """
+        You are an expert AI image quality inspector. I am providing you with 3 images in this exact order:
+        1. Original Person Image
+        2. Original Garment/Product Image
+        3. Virtual Try-On Result Image (AI Generated)
+
+        Please analyze the Result Image compared to the original inputs and check for critical errors:
+        1. Body Distortion: Did the AI cause severe body distortions? (e.g., missing arms, missing legs, extra fingers, completely deformed body structure compared to the original person).
+        2. Product Distortion & Details: Does the result image LOSE or DISTORT the exact pattern (e.g., plaid, checkered/caro, striped, floral), logos, graphics, or the exact color shade of the original garment? If the pattern is missing/blurred out or drastically different, it is a FAIL.
+
+        Reply with ONLY the word "PASS" if the result is acceptable, maintains the exact garment patterns/details, and has no severe body artifacts.
+        Reply with ONLY the word "FAIL" if there are missing limbs, severe body distortion, or if the garment's specific pattern/color is lost or ruined.
+        """
+        
+        response = model.generate_content([prompt, p_img, g_img, r_img])
+        answer = response.text.strip().upper()
+        print(f"[GEMINI EVALUATOR] Đánh giá chất lượng VTON: {answer}")
+        
+        if "FAIL" in answer:
+            return False
+        return True
+    except Exception as e:
+        print(f"[GEMINI EVALUATOR] Lỗi trong quá trình kiểm tra: {e}")
+        return True # Lỗi API thì cứ cho qua (không block luồng)
+
+def call_local_viton_api(person_path, garment_path):
+    """Sử dụng Local VITON-HD API (Fallback cho khi các dịch vụ Cloud bị sập/hết quota)"""
+    import os, requests, uuid, base64
+    try:
+        api_url = os.getenv("VTON_API_URL", "http://localhost:5000/try_on")
+        print(f"[LOCAL-VITON] Đang gọi Local API: {api_url}")
+        
+        files = {
+            'person_image': ('person.png', open(person_path, 'rb'), 'image/png'),
+            'garment_image': ('garment.png', open(garment_path, 'rb'), 'image/png'),
+        }
+        
+        response = requests.post(api_url, files=files, timeout=600) # Local API trên CPU có thể lâu
+        for f in files.values():
+            if hasattr(f[1], 'close'): f[1].close()
+            
+        if response.status_code == 200:
+            data = response.json()
+            if 'result' in data:
+                img_data = base64.b64decode(data['result'])
+                ext = os.path.splitext(person_path)[1] or ".png"
+                out_name = f"local_viton_{uuid.uuid4().hex}{ext}"
+                out_path = os.path.join(os.path.dirname(person_path), out_name)
+                with open(out_path, 'wb') as f:
+                    f.write(img_data)
+                print(f"[LOCAL-VITON] ✅ Thành công! Ảnh lưu tại: {out_path}")
+                return out_path, False, None
+            else:
+                return person_path, True, "Local API did not return 'result' in JSON"
+        else:
+            err = f"Local VITON HTTP {response.status_code}: {response.text[:200]}"
+            print(f"[LOCAL-VITON] ❌ Lỗi: {err}")
+            return person_path, True, err
+    except requests.exceptions.ConnectionError:
+        err = "Local VITON API is offline (Connection Refused)."
+        print(f"[LOCAL-VITON] ❌ {err}")
+        return person_path, True, err
+    except Exception as e:
+        print(f"[LOCAL-VITON] ❌ Lỗi: {e}")
+        return person_path, True, str(e)
+
+
+def call_hf_kolors_vton_api(person_path, garment_path):
+    """Sử dụng HuggingFace Kolors-Virtual-Try-On (Bảo toàn màu sắc tốt nhất, tỷ lệ lỗi tay cực thấp)"""
+    import os, uuid, shutil
+    try:
+        from gradio_client import handle_file
+        client = get_hf_client("Kwai-Kolors/Kolors-Virtual-Try-On")
+        if not client: raise Exception("Space offline")
+        print(f"[KOLORS-VTON] Đang gọi HuggingFace Kolors-VTON cho: {os.path.basename(garment_path)}")
+        
+        # Kolors API requires person_img, garment_img, seed, randomize_seed
+        # Cập nhật: Dùng fn_index=2 vì API name đã bị ẩn
+        result = client.predict(
+            person_img=handle_file(person_path),
+            garment_img=handle_file(garment_path),
+            seed=42,
+            randomize_seed=False,
+            fn_index=2
+        )
+        out_img = result[0] if isinstance(result, (list, tuple)) else result
+        ext = os.path.splitext(person_path)[1] or ".png"
+        out_name = f"kolors_vton_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        shutil.copyfile(out_img, out_path)
+        print(f"[KOLORS-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[KOLORS-VTON] ❌ Lỗi: {e}")
+        return person_path, True, f"Kolors-VTON Error: {str(e)}"
+
+
+def call_hf_ootdiffusion_api(person_path, garment_path, category="Upper-body"):
+    """Sử dụng HuggingFace OOTDiffusion (Rất tốt trong việc giữ nguyên tay chân)"""
+    import os, uuid, shutil
+    try:
+        from gradio_client import handle_file
+        client = get_hf_client("levihsu/OOTDiffusion")
+        if not client: raise Exception("Space offline")
+            
+        print(f"[OOT-VTON] Đang gọi HuggingFace OOTDiffusion cho: {os.path.basename(garment_path)} | Category: {category}")
+        
+        # OOTDiffusion trả về Gallery (List of dicts)
+        result = client.predict(
+            vton_img=handle_file(person_path),
+            garm_img=handle_file(garment_path),
+            category=category,
+            n_samples=1,
+            n_steps=20,
+            image_scale=2.0,
+            seed=-1,
+            api_name="/process_dc"
+        )
+        
+        # Lấy ảnh đầu tiên từ Gallery
+        if isinstance(result, list) and len(result) > 0:
+            out_img = result[0]['image'] if isinstance(result[0], dict) else result[0]
+        else:
+            out_img = result
+            
+        ext = os.path.splitext(person_path)[1] or ".png"
+        out_name = f"oot_vton_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        shutil.copyfile(out_img, out_path)
+        print(f"[OOT-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[OOT-VTON] ❌ Lỗi: {e}")
+        return person_path, True, f"OOTDiffusion Error: {str(e)}"
+
+
+def call_hf_idmvton_api(person_path, garment_path, garment_des=""):
+    """Sử dụng HuggingFace IDM-VTON cực kỳ chính xác (Mặc định không mất tay)"""
+    import os, uuid, shutil
+    try:
+        from gradio_client import handle_file
+        client = get_hf_client("yisol/IDM-VTON")
+        if not client: raise Exception("Space offline")
+        print(f"[IDM-VTON] Đang gọi HuggingFace IDM-VTON cho: {os.path.basename(garment_path)} | Prompt: {garment_des[:30]}...")
+        
+        result = client.predict(
+            dict={"background": handle_file(person_path), "layers": [], "composite": None},
+            garm_img=handle_file(garment_path),
+            garment_des=garment_des + ", intact arms, intact hands, clear fingers, realistic human anatomy, highly detailed garment pattern, perfect fabric texture",
+            is_checked=True,
+            is_checked_crop=False,
+            denoise_steps=30, # Nâng cao cấu trúc khớp nối
+            seed=42,
+            api_name="/tryon"
+        )
+        out_img = result[0] if isinstance(result, (list, tuple)) else result
+        ext = os.path.splitext(person_path)[1] or ".png"
+        out_name = f"idm_vton_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        shutil.copyfile(out_img, out_path)
+        print(f"[IDM-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[IDM-VTON] ❌ Lỗi: {e}")
+        return person_path, True, f"IDM-VTON Error: {str(e)}"
+
+def call_hf_fashn_vton_api(person_path, garment_path, category="tops"):
+    """
+    Sử dụng Fashn-VTON-1.5 (Model mới nhất, cực tốt trong việc giữ tay chân và màu sắc).
+    Ưu điểm: Hỗ trợ segmentation_free giúp giảm thiểu tối đa lỗi mất tay/chân và giữ Pattern cực tốt.
+    """
+    import os, uuid, shutil
+    try:
+        from gradio_client import handle_file
+        client = get_hf_client("fashn-ai/fashn-vton-1.5")
+        if not client: raise Exception("Space offline")
+            
+        print(f"[FASHN-VTON] Đang gọi Fashn-VTON 1.5 cho: {os.path.basename(garment_path)} | Category: {category}")
+        
+        result = client.predict(
+            person_image=handle_file(person_path),
+            garment_image=handle_file(garment_path),
+            category=category,
+            garment_photo_type="model",
+            num_timesteps=50,
+            guidance_scale=2.0,
+            seed=42,
+            segmentation_free=True, # QUAN TRỌNG: Không xóa nền người, giữ nguyên tay chân
+            api_name="/try_on"
+        )
+        
+        out_img = result[0] if isinstance(result, (list, tuple)) else result
+        if isinstance(out_img, dict):
+            out_img = out_img.get("path") or out_img.get("url")
+            
+        ext = os.path.splitext(person_path)[1] or ".png"
+        out_name = f"fashn_vton_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        shutil.copyfile(out_img, out_path)
+        print(f"[FASHN-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[FASHN-VTON] ❌ Lỗi: {e}")
+        return person_path, True, f"Fashn-VTON Error: {str(e)}"
+
+def call_hf_outfit_anyone_api(person_path, garment_path):
+    """Sử dụng OutfitAnyone (Rất ổn định, miễn phí và giữ màu cực tốt). Phù hợp làm phương án dự phòng cuối cùng."""
+    import os, uuid, shutil
+    try:
+        from gradio_client import handle_file
+        client = get_hf_client("humanAIGC/OutfitAnyone")
+        if not client: raise Exception("Space offline")
+        
+        print(f"[OUTFIT-ANYONE] Đang gọi OutfitAnyone cho: {os.path.basename(garment_path)}")
+        
+        # OutfitAnyone yêu cầu model_name, garment1, garment2
+        result = client.predict(
+            model_name=handle_file(person_path),
+            garment1=handle_file(garment_path),
+            garment2=handle_file(garment_path), # Cùng 1 ảnh nếu chỉ có 1 món
+            api_name="/get_tryon_result"
+        )
+        
+        out_img = result if isinstance(result, str) else result[0]
+        ext = os.path.splitext(person_path)[1] or ".png"
+        out_name = f"outfit_anyone_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        shutil.copyfile(out_img, out_path)
+        print(f"[OUTFIT-ANYONE] ✅ Thành công! Ảnh lưu tại: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[OUTFIT-ANYONE] ❌ Lỗi: {e}")
+        return person_path, True, f"OutfitAnyone Error: {str(e)}"
 
 def call_texel_moda_api(person_path, garment_path, category, sex="female"):
     """Tích hợp Texel Moda API (RapidAPI) sử dụng endpoint /try-on-file (Multipart/Form-Data)."""
@@ -2973,9 +3142,15 @@ def call_texel_moda_api(person_path, garment_path, category, sex="female"):
             'clothing_image': ('garment.png', open(garment_path, 'rb'), 'image/png'),
         }
         
-        # Tham số giới tính
+        # Thêm mapping clothing_type để cố định vị trí tay (không bị xóa)
+        clothing_type = "upper_body"
+        if category == "bottoms": clothing_type = "lower_body"
+        elif category in ["dresses", "one-pieces"]: clothing_type = "dresses"
+
+        # Tham số giới tính và loại áo quần
         payload = {
-            'avatar_sex': sex
+            'avatar_sex': sex,
+            'clothing_type': clothing_type
         }
         
         headers = {
@@ -3020,25 +3195,8 @@ def call_texel_moda_api(person_path, garment_path, category, sex="female"):
         print(f"[TEXEL-MODA] ❌ Lỗi ngoại lệ: {str(e)}")
         err_msg = str(e)
 
-    # NẾU CÓ LỖI: Trả về một ảnh chứa chữ lỗi để User thấy rõ trên màn hình thay vì gỡ lỗi ngầm
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-        img = Image.open(person_path).convert("RGBA")
-        draw = ImageDraw.Draw(img)
-        text = f"RAPID API ERROR:\n{err_msg}\nvui long Subscribe tren RapidAPI!"
-        draw.rectangle(((50, 50), (450, 150)), fill="red")
-        draw.text((60, 60), text, fill="white")
-        
-        ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"error_texel_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        img.save(out_path)
-        return out_path, True, f"Texel Moda Error: {err_msg}" # Return True for fallback flag so 'tried_items' isn't populated, preventing the fake Shopee cart from rendering when an API error occurred.
-    except Exception as e_pil:
-        print(f"[TEXEL-MODA] ❌ Lỗi vẽ PIL fallback: {e_pil}")
-        import traceback
-        traceback.print_exc()
-        return person_path, True, f"Texel Moda Exception: {err_msg}"
+    # NẾU CÓ LỖI: Trả về ảnh gốc để fallback an toàn
+    return person_path, True, f"Texel Moda Error: {err_msg}"
 
 
 def _prepare_garment_for_ai(g_abs, save_dir):
@@ -3131,23 +3289,103 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
             # CHUẨN HÓA BẮT BUỘC TRƯỚC KHI GỬI AI
             g_abs = _prepare_garment_for_ai(g_abs, os.path.join(static_folder_path, 'uploads', 'tryon'))
             
+            # Lớp bảo vệ bổ sung: Dùng Gemini đọc màu chuẩn trước khi cho AI tự đoán
+            g_des = generate_garment_description_with_gemini(g_abs)
+            
+            # Kiểm tra xem có Token HF không
+            has_hf_token = False
+            hf_token = os.getenv("HF_TOKEN", "")
+            if hf_token and "hf_" in hf_token:
+                has_hf_token = True
+
             try:
-                # 1. First attempt: Primary Provider (usually Colab or Local Server)
-                print(f"[TRYON] Attempt 1: Calling Primary VTON API...")
-                res_path, fb, err = call_my_vton_api(person_path, g_abs, category=fashn_cat, garment_photo_type=photo_type)
-                
-                # 2. SEAMLESS FALLBACK: If Primary fails, call RapidAPI (Texel Moda) automatically
-                if fb:
-                    print(f"[TRYON] ⚠️ Primary API failed ({err}). Falling back to RapidAPI (Texel Moda)...")
-                    sex = "male" if "male" in gender.lower() or "nam" in gender.lower() else "female"
-                    res_path, fb, err = call_texel_moda_api(person_path, g_abs, category=fashn_cat, sex=sex)
+                # 1. First attempt: Call IDM-VTON (Ưu tiên theo yêu cầu)
+                if has_hf_token:
+                    print(f"[TRYON] Attempt 1: Calling IDM-VTON (HuggingFace)...")
+                    res_path, fb, err = call_hf_idmvton_api(person_path, g_abs, garment_des=g_des)
                     
                     if not fb:
-                        print("[TRYON] ✅ Fallback succeeded! Continuing with Texel Moda output.")
-                    else:
-                        print(f"[TRYON] ❌ Both APIs failed for {name}.")
+                        is_good = evaluate_vton_result_with_gemini(person_path, g_abs, res_path)
+                        if not is_good:
+                            print(f"[TRYON] ⚠️ IDM-VTON bị Gemini đánh giá LỖI. Falling back...")
+                            fb = True
+                            err = "Gemini Evaluator: IDM-VTON output has distortion."
+                else:
+                    print(f"[TRYON] ⚠️ Bỏ qua HuggingFace API vì không có Token.")
+                    fb = True
+                    err = "Missing HF Token"
+
+
+                # 2. SEAMLESS FALLBACK 1: Call Fashn-VTON 1.5
+                if fb and has_hf_token:
+                    print(f"[TRYON] ⚠️ IDM-VTON failed. Falling back to Fashn-VTON 1.5...")
+                    res_path, fb, err = call_hf_fashn_vton_api(person_path, g_abs, category=fashn_cat)
+                    if not fb:
+                        is_good = evaluate_vton_result_with_gemini(person_path, g_abs, res_path)
+                        if not is_good:
+                            fb = True
+                            err = "Gemini Evaluator: Fashn-VTON output has distortion."
+
+                # 3. SEAMLESS FALLBACK 2: Call Kolors-VTON
+                if fb and has_hf_token:
+                    print(f"[TRYON] ⚠️ Fashn-VTON failed. Falling back to Kolors-VTON...")
+                    res_path, fb, err = call_hf_kolors_vton_api(person_path, g_abs)
+                    if not fb:
+                        is_good = evaluate_vton_result_with_gemini(person_path, g_abs, res_path)
+                        if not is_good:
+                            fb = True
+                            err = "Gemini Evaluator: Kolors output has distortion."
                 
-                # ALWAYS update person_path and final_path so any visual fallback image (error or otherwise) is propagated to the final copied output.
+                # 4. SEAMLESS FALLBACK 3: Call OutfitAnyone
+                if fb and has_hf_token:
+                    print(f"[TRYON] ⚠️ IDM-VTON failed. Falling back to OutfitAnyone...")
+                    res_path, fb, err = call_hf_outfit_anyone_api(person_path, g_abs)
+
+
+                # 5. SEAMLESS FALLBACK 4: Call RapidAPI (Texel Moda)
+                if fb:
+                    print(f"[TRYON] ⚠️ APIs failed ({err}). Falling back to RapidAPI (Texel Moda)...")
+                    sex = "male" if "male" in gender.lower() or "nam" in gender.lower() else "female"
+                    
+                    # Cố gắng fix ảnh PNG RGBA thành RGB JPEG trước khi gửi cho Texel Moda để tránh lỗi 400
+                    try:
+                        from PIL import Image
+                        safe_person = person_path + "_safe.jpg"
+                        Image.open(person_path).convert("RGB").save(safe_person, format="JPEG")
+                        safe_garment = g_abs + "_safe.jpg"
+                        Image.open(g_abs).convert("RGB").save(safe_garment, format="JPEG")
+                        res_path, fb, err = call_texel_moda_api(safe_person, safe_garment, category=fashn_cat, sex=sex)
+                    except Exception as e:
+                        res_path, fb, err = call_texel_moda_api(person_path, g_abs, category=fashn_cat, sex=sex)
+                    
+                    if not fb:
+                        print("[TRYON] ✅ Fallback to Texel Moda succeeded!")
+
+                # 6. SEAMLESS FALLBACK 5: Call OOTDiffusion
+                if fb and has_hf_token:
+                    print(f"[TRYON] ⚠️ Texel Moda failed ({err}). Falling back to OOTDiffusion...")
+                    oot_cat = "Upper-body"
+                    if fashn_cat == "bottoms": oot_cat = "Lower-body"
+                    elif fashn_cat in ["dresses", "one-pieces"]: oot_cat = "Dress"
+                    res_path, fb, err = call_hf_ootdiffusion_api(person_path, g_abs, category=oot_cat)
+
+                # NẾU TẤT CẢ ĐỀU THẤT BẠI
+                if fb:
+                    print(f"[TRYON] ❌ TẤT CẢ API ĐỀU THẤT BẠI. Lý do cuối: {err}")
+                    try:
+                        from PIL import Image, ImageDraw
+                        img = Image.open(person_path).convert("RGBA")
+                        draw = ImageDraw.Draw(img)
+                        draw.rectangle(((20, 20), (450, 100)), fill="red")
+                        draw.text((30, 30), f"API LỖI/HẾT QUOTA:\n{err[:50]}", fill="white")
+                        ext = os.path.splitext(person_path)[1] or ".png"
+                        res_path = f"error_tryon_{uuid.uuid4().hex}{ext}"
+                        out_error = os.path.join(os.path.dirname(person_path), res_path)
+                        img.save(out_error)
+                        res_path = out_error
+                    except:
+                        pass
+                        
                 person_path = res_path
                 final_path = res_path
                 
@@ -3156,6 +3394,7 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
                 else:
                     if not last_error_msg:
                         last_error_msg = err
+
 
             except Exception as e:
                 err_str = f"[{type(e).__name__}] {e}"

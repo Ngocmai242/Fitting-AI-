@@ -646,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showTool('remove');
         });
         if (removeBgChoose && fileRemove) {
-            removeBgChoose.addEventListener('click', () => fileRemove.click());
+            removeBgChoose.addEventListener('click', () => { fileRemove.value = ''; fileRemove.click(); });
         }
         fileRemove.addEventListener('change', (e) => {
             const f = e.target.files && e.target.files[0];
@@ -839,7 +839,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // open color picker
         recolorChoose.addEventListener('click', () => recolorColor && recolorColor.click());
         if (recolorChooseImage) {
-            recolorChooseImage.addEventListener('click', () => recolorFile.click());
+            recolorChooseImage.addEventListener('click', () => { recolorFile.value = ''; recolorFile.click(); });
         }
         const recolorFileThumb = document.getElementById('recolor-file-thumb');
         recolorFile.addEventListener('change', (e) => {
@@ -882,10 +882,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showTool('changebg');
         });
         if (changeBgChooseImage && changeBgFile) {
-            changeBgChooseImage.addEventListener('click', () => changeBgFile.click());
+            changeBgChooseImage.addEventListener('click', () => { changeBgFile.value = ''; changeBgFile.click(); });
         }
         if (changeBgChooseBg && changeBgBgFile) {
-            changeBgChooseBg.addEventListener('click', () => changeBgBgFile.click());
+            changeBgChooseBg.addEventListener('click', () => { changeBgBgFile.value = ''; changeBgBgFile.click(); });
         }
         if (changeBgFile) {
             changeBgFile.addEventListener('change', (e) => {
@@ -950,7 +950,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setToolParam('upscale');
             showTool('upscale');
         });
-        upscaleChoose.addEventListener('click', () => upscaleFile.click());
+        upscaleChoose.addEventListener('click', () => { upscaleFile.value = ''; upscaleFile.click(); });
         const upscaleFilePanel = document.getElementById('upscale-file-panel');
         const upscaleFileThumb = document.getElementById('upscale-file-thumb');
         const upscaleFileName = document.getElementById('upscale-file-name');

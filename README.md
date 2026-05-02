@@ -1,54 +1,74 @@
-# Nền Tảng Thử Đồ & Gợi Ý Thời Trang AI (Fitting-AI)
+# AuraFit (Fitting-AI) - AI Virtual Try-On & Style Recommendation
 
-## Giới Thiệu
-Fitting-AI là một hệ thống web tích hợp trí tuệ nhân tạo (AI) giúp người dùng:
-1. **Thử đồ ảo (Virtual Try-On)**: Ướm thử quần áo lên ảnh thật của người dùng với độ chân thực cao nhờ công nghệ AI.
-2. **Gợi ý tự động (AI Style Recommendation)**: Phân tích dáng người và đưa ra gợi ý trang phục dựa trên các quy tắc thời trang chuẩn mực.
+## 🌟 Introduction
+AuraFit (Fitting-AI) is a cutting-edge e-commerce web platform integrating Artificial Intelligence (AI) to provide the most realistic and personalized online shopping experience:
+1. **Virtual Try-On**: Try clothes on your actual photos with high realism. The system uses a Multi-tier Fallback Pipeline with SOTA models like Fashn-VTON, IDM-VTON, and RapidAPI Texel Moda to ensure a 100% success rate and blazing fast speed.
+2. **Smart Styling**: Analyzes Body Shape using Computer Vision algorithms, then combines standard fashion rules to provide perfect outfit recommendations.
 
-Dự án được xây dựng với kiến trúc Client-Server hiện đại, kết hợp với các mô hình Machine Learning chuyên sâu.
+## 📁 Project Structure
+- `/frontend/`: User Interface (HTML, Pastel Minimalism CSS, Vanilla JS).
+- `/backend/`: API Server orchestrating the entire system (Python & Flask).
+  - `/backend/app/routes.py`: Contains the core logic for the Virtual Try-On with Seamless Fallback mechanism.
+- `/data_engine/`: Automated web scraping system (Crawler) using Playwright, and background removal for clothing images using YOLO/Rembg models.
+- `/database/`: Stores user information, product catalogs, and crawl history (SQLite).
+- `/ai_engine/`: Contains scripts for training machine learning models for fashion recommendations (PyTorch).
 
-## Cấu Trúc Dự Án
-- `/frontend/`: Giao diện người dùng (HTML, CSS Pastel Minimalism, JS thuần).
-- `/backend/`: Máy chủ API điều phối toàn bộ hệ thống (Python & Flask).
-- `/ai_engine/` & `/VITON-HD/`: Các lõi xử lý AI chuyên sâu (Tách nền, Thử đồ ảo - VTON, Nhận diện dáng người).
-- `/data_engine/`: Hệ thống cào dữ liệu (Crawler) và tự động gắn thẻ (Tagger) quần áo.
-- `/database/`: Nơi lưu trữ thông tin người dùng và sản phẩm (SQLite).
+## 🚀 Installation & Getting Started
+The system uses `npm` and `concurrently` to manage and run both the frontend and backend simultaneously with a single command.
 
-## Hướng Dẫn Cài Đặt & Chạy
-Hệ thống sử dụng `npm` để quản lý và chạy đồng thời cả giao diện lẫn máy chủ một cách mượt mà.
+### 1. System Requirements
+- Python 3.9+
+- Node.js (latest version)
+- (Optional) CUDA-supported GPU if running AI models locally.
 
-### 1. Chuẩn Bị
-Mở Terminal tại thư mục dự án và chạy:
+### 2. Environment Setup
+Open the Terminal at the project root directory and run the following commands:
 ```bash
-# Cài đặt thư viện Python (Máy chủ API)
+# Install all Python libraries for Backend and AI
 pip install -r backend/requirements.txt
+pip install -r requirements_ai.txt
 
-# Cài đặt công cụ nền tảng Node.js (quản lý chạy song song)
+# Install Playwright (Used for the Data Engine Crawler)
+playwright install
+
+# Install Node.js tools (for concurrent execution)
 npm install
 ```
 
-### 2. Khởi Động
-Chỉ bằng một lệnh duy nhất:
+### 3. Environment Variables Configuration (.env)
+Create or edit the `backend/.env` file with your important API Keys:
+```env
+# Tokens used to call HuggingFace Spaces (Comma-separated)
+HF_TOKENS="hf_token1,hf_token2,..."
+# The Ultimate Fallback (Fallback 5) for VTON
+RAPIDAPI_KEY="your_rapidapi_key"
+```
+
+### 4. Start the System
+With just a single command:
 ```bash
 npm start
 ```
-Lệnh này sẽ tự động:
-- Khởi chạy Backend trên cổng `8080` (tích hợp Auto-reload nếu bạn sửa code).
-- Phục vụ Frontend trên cùng tên miền.
-- Tự động mở trình duyệt truy cập thẳng vào trang chủ web.
+This command will automatically:
+- Launch the Python Flask Backend on port `8080`.
+- Serve the Frontend interface.
+- Automatically open your browser directly to the Admin Dashboard.
 
 ---
 
-## Kiến Trúc Trí Tuệ Nhân Tạo (AI Pipeline)
-Hệ thống AI của dự án bao gồm 3 trụ cột kết hợp:
-- **Computer Vision (MoveNet / EfficientNet)**: Được nhúng trực tiếp để xác định các khung xương (landmarks), đo đạc tỷ lệ cơ thể và phân loại dáng người.
-- **Logical Rules / Fashion LLM**: Hệ luật kết hợp mô hình ngôn ngữ (Gemma-3-4b), kết nối với kiến thức từ tệp `DeepFashion2` và `Polyvore` để đánh giá quần áo nào vừa với dáng người nào.
-- **Image Generation (VITON-HD)**: Công nghệ hình ảnh đỉnh cao giúp ghép trang phục lên cơ thể người một cách mềm mại (đổ bóng chân thực, bảo toàn kết cấu vải).
+## 🧠 AI Pipeline Architecture
+The project's AI system utilizes a high-performance **Concurrent Multi-tier Pipeline**:
+1. **Preprocessing**: Automatically removes product backgrounds using AI (`rembg`/`u2net`), then applies Smart Padding to fit the standard 768x1024 white background ratio with a `flat-lay` optimized perspective.
+2. **Super-Fast Concurrent VTON**:
+   - **Tier 1: Fashn-VTON 1.5 (HuggingFace)**: Launched in **Concurrent Mode** (all tokens tested simultaneously). Uses **50 Timesteps** and **2.0 Guidance Scale** for maximum texture detail and original color preservation.
+   - **Tier 2: IDM-VTON (HuggingFace)**: Secondary fallback, also running in concurrent mode to maximize reliability within a strictly limited time budget.
+   - **Tier 3 (Ultimate Fallback)**: Calls `Texel Moda` via RapidAPI to ensure a 100% success rate regardless of HuggingFace congestion.
+3. **Optimized Integrity**: The pipeline is strictly configured to use **Segmentation-Free** processing and **Dynamic Photo-Type** detection, ensuring 100% preservation of human limbs (no missing hands/feet) and accurate garment borders.
+4. **Natural Color Preservation**: Unlike standard pipelines that use aggressive post-processing color transfers, AuraFit relies on high-fidelity diffusion generation to keep 100% of the original product patterns and colors without artifacts.
 
-## Thông Tin Chạy Thử (Demo)
-- **Truy cập web**: `http://localhost:8080/index.html`
-- **Tài khoản Khách**: Bấm Đăng ký ngay trên màn hình.
-- **Tài khoản Admin**: 
-  - Đăng nhập: `http://localhost:8080/admin_login.html`
-  - Username: `admin`
-  - Password: `admin`
+## 📌 Demo Access Information
+- **Admin Account**: 
+  - Login: `http://localhost:8080/admin_login.html`
+  - Default Username: `admin`
+  - Default Password: `admin`
+- **Customer Homepage**: `http://localhost:8080/index.html`

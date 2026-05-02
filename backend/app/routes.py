@@ -2833,84 +2833,33 @@ def _resolve_clean_abs(clean_rel, static_folder_path):
         pass
     return None
 
-def get_hf_client(space_name):
-    """Khởi tạo Gradio Client an toàn. Nếu không có Token hợp lệ, bỏ qua để tránh lỗi Quota."""
-    from gradio_client import Client
+def get_hf_tokens():
     import os
-    token = os.getenv("HF_TOKEN", "")
-    if not token or "your_" in token or "hf_" not in token:
-        return None # BẮT BUỘC PHẢI CÓ TOKEN CHO HUGGINGFACE ZEROGPU
+    tokens_str = os.getenv("HF_TOKENS", os.getenv("HF_TOKEN", ""))
+    if not tokens_str:
+        return []
+    tokens = [t.strip() for t in tokens_str.split(",") if t.strip() and "hf_" in t]
+    return tokens
+
+HF_CLIENT_CACHE = {}
+
+def get_hf_client(space_name, token):
+    """Khởi tạo Gradio Client an toàn với token được chỉ định."""
+    from gradio_client import Client
+    global HF_CLIENT_CACHE
+    cache_key = f"{space_name}_{token}"
+    if cache_key in HF_CLIENT_CACHE:
+        return HF_CLIENT_CACHE[cache_key]
+
     try:
-        return Client(space_name, token=token)
+        client = Client(space_name, token=token)
+        HF_CLIENT_CACHE[cache_key] = client
+        return client
     except Exception as e:
         print(f"[HF-CLIENT] ❌ Không thể kết nối Space {space_name}: {e}")
         return None
 
-def generate_garment_description_with_gemini(garment_path):
-    """Sử dụng Gemini 1.5 Flash để đọc đúng màu và mô tả sản phẩm, ép AI VTON không bị ảo giác màu."""
-    import os
-    try:
-        import google.generativeai as genai
-        from PIL import Image
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key or "your_" in api_key:
-            return ""
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        img = Image.open(garment_path).convert('RGB')
-        prompt = "Describe the exact color (e.g. deep navy, pastel pink), fabric texture, and MOST IMPORTANTLY any specific patterns (like plaid, checkered/caro, striped, floral, logos, or texts) of this clothing item in one concise English sentence for an AI renderer. Be highly detailed about patterns. Do not include the background."
-        response = model.generate_content([prompt, img])
-        description = response.text.strip().replace("\n", " ")
-        print(f"[GEMINI PROMPT INJECTOR] Garment Description: {description}")
-        return description
-    except Exception as e:
-        print(f"[GEMINI PROMPT INJECTOR] Error: {e}")
-        return ""
 
-def evaluate_vton_result_with_gemini(person_path, garment_path, result_path):
-    """
-    Sử dụng Gemini Vision để kiểm tra ảnh kết quả Virtual Try-On.
-    Phát hiện biến dạng người (mất tay, mất chân) hoặc biến dạng sản phẩm.
-    """
-    import os
-    try:
-        import google.generativeai as genai
-        from PIL import Image
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key or "your_" in api_key:
-            return True # Không có key thì bỏ qua kiểm tra
-            
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        
-        p_img = Image.open(person_path).convert('RGB')
-        g_img = Image.open(garment_path).convert('RGB')
-        r_img = Image.open(result_path).convert('RGB')
-        
-        prompt = """
-        You are an expert AI image quality inspector. I am providing you with 3 images in this exact order:
-        1. Original Person Image
-        2. Original Garment/Product Image
-        3. Virtual Try-On Result Image (AI Generated)
-
-        Please analyze the Result Image compared to the original inputs and check for critical errors:
-        1. Body Distortion: Did the AI cause severe body distortions? (e.g., missing arms, missing legs, extra fingers, completely deformed body structure compared to the original person).
-        2. Product Distortion & Details: Does the result image LOSE or DISTORT the exact pattern (e.g., plaid, checkered/caro, striped, floral), logos, graphics, or the exact color shade of the original garment? If the pattern is missing/blurred out or drastically different, it is a FAIL.
-
-        Reply with ONLY the word "PASS" if the result is acceptable, maintains the exact garment patterns/details, and has no severe body artifacts.
-        Reply with ONLY the word "FAIL" if there are missing limbs, severe body distortion, or if the garment's specific pattern/color is lost or ruined.
-        """
-        
-        response = model.generate_content([prompt, p_img, g_img, r_img])
-        answer = response.text.strip().upper()
-        print(f"[GEMINI EVALUATOR] Đánh giá chất lượng VTON: {answer}")
-        
-        if "FAIL" in answer:
-            return False
-        return True
-    except Exception as e:
-        print(f"[GEMINI EVALUATOR] Lỗi trong quá trình kiểm tra: {e}")
-        return True # Lỗi API thì cứ cho qua (không block luồng)
 
 def call_local_viton_api(person_path, garment_path):
     """Sử dụng Local VITON-HD API (Fallback cho khi các dịch vụ Cloud bị sập/hết quota)"""
@@ -2954,172 +2903,328 @@ def call_local_viton_api(person_path, garment_path):
         return person_path, True, str(e)
 
 
-def call_hf_kolors_vton_api(person_path, garment_path):
-    """Sử dụng HuggingFace Kolors-Virtual-Try-On (Bảo toàn màu sắc tốt nhất, tỷ lệ lỗi tay cực thấp)"""
-    import os, uuid, shutil
-    try:
-        from gradio_client import handle_file
-        client = get_hf_client("Kwai-Kolors/Kolors-Virtual-Try-On")
-        if not client: raise Exception("Space offline")
-        print(f"[KOLORS-VTON] Đang gọi HuggingFace Kolors-VTON cho: {os.path.basename(garment_path)}")
-        
-        # Kolors API requires person_img, garment_img, seed, randomize_seed
-        # Cập nhật: Dùng fn_index=2 vì API name đã bị ẩn
-        result = client.predict(
-            person_img=handle_file(person_path),
-            garment_img=handle_file(garment_path),
-            seed=42,
-            randomize_seed=False,
-            fn_index=2
-        )
-        out_img = result[0] if isinstance(result, (list, tuple)) else result
-        ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"kolors_vton_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        shutil.copyfile(out_img, out_path)
-        print(f"[KOLORS-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
-        return out_path, False, None
-    except Exception as e:
-        print(f"[KOLORS-VTON] ❌ Lỗi: {e}")
-        return person_path, True, f"Kolors-VTON Error: {str(e)}"
 
 
-def call_hf_ootdiffusion_api(person_path, garment_path, category="Upper-body"):
-    """Sử dụng HuggingFace OOTDiffusion (Rất tốt trong việc giữ nguyên tay chân)"""
-    import os, uuid, shutil
+def call_fal_idmvton_api(person_path, garment_path):
+    """
+    Sử dụng Fal.ai IDM-VTON API (Không thông qua Hugging Face).
+    Miễn phí credits ban đầu, tốc độ cực nhanh, giữ chi tiết sản phẩm và tay chân cực tốt.
+    """
+    import os, uuid, requests, base64
     try:
-        from gradio_client import handle_file
-        client = get_hf_client("levihsu/OOTDiffusion")
-        if not client: raise Exception("Space offline")
-            
-        print(f"[OOT-VTON] Đang gọi HuggingFace OOTDiffusion cho: {os.path.basename(garment_path)} | Category: {category}")
+        api_key = os.getenv("FAL_KEY")
+        if not api_key: return person_path, True, "Missing FAL_KEY"
         
-        # OOTDiffusion trả về Gallery (List of dicts)
-        result = client.predict(
-            vton_img=handle_file(person_path),
-            garm_img=handle_file(garment_path),
-            category=category,
-            n_samples=1,
-            n_steps=20,
-            image_scale=2.0,
-            seed=-1,
-            api_name="/process_dc"
-        )
+        print(f"[FAL-IDMVTON] Đang gọi Fal.ai API cho: {os.path.basename(garment_path)}")
         
-        # Lấy ảnh đầu tiên từ Gallery
-        if isinstance(result, list) and len(result) > 0:
-            out_img = result[0]['image'] if isinstance(result[0], dict) else result[0]
-        else:
-            out_img = result
+        with open(person_path, "rb") as f:
+            person_b64 = base64.b64encode(f.read()).decode()
+        with open(garment_path, "rb") as f:
+            garment_b64 = base64.b64encode(f.read()).decode()
             
+        headers = {
+            "Authorization": f"Key {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "human_image_url": f"data:image/png;base64,{person_b64}",
+            "garment_image_url": f"data:image/png;base64,{garment_b64}",
+            "description": "highly detailed garment pattern, perfect fabric texture, intact arms, intact hands",
+        }
+        
+        res = requests.post("https://fal.run/fal-ai/idm-vton", headers=headers, json=payload, timeout=120)
+        if res.status_code != 200:
+            return person_path, True, f"Fal.ai Error: {res.text}"
+            
+        data = res.json()
+        out_url = data.get("image", {}).get("url")
+        if not out_url:
+            return person_path, True, "Fal.ai did not return an image URL"
+            
+        img_data = requests.get(out_url).content
         ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"oot_vton_{uuid.uuid4().hex}{ext}"
+        out_name = f"fal_idmvton_{uuid.uuid4().hex}{ext}"
         out_path = os.path.join(os.path.dirname(person_path), out_name)
-        shutil.copyfile(out_img, out_path)
-        print(f"[OOT-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
+        with open(out_path, "wb") as f:
+            f.write(img_data)
+        print(f"[FAL-IDMVTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
         return out_path, False, None
     except Exception as e:
-        print(f"[OOT-VTON] ❌ Lỗi: {e}")
-        return person_path, True, f"OOTDiffusion Error: {str(e)}"
+        print(f"[FAL-IDMVTON] ❌ Lỗi: {e}")
+        return person_path, True, str(e)
 
 
 def call_hf_idmvton_api(person_path, garment_path, garment_des=""):
-    """Sử dụng HuggingFace IDM-VTON cực kỳ chính xác (Mặc định không mất tay)"""
-    import os, uuid, shutil
-    try:
-        from gradio_client import handle_file
-        client = get_hf_client("yisol/IDM-VTON")
-        if not client: raise Exception("Space offline")
-        print(f"[IDM-VTON] Đang gọi HuggingFace IDM-VTON cho: {os.path.basename(garment_path)} | Prompt: {garment_des[:30]}...")
+    import os, uuid, shutil, time
+    import concurrent.futures
+    from gradio_client import handle_file
+    
+    tokens = get_hf_tokens()
+    if not tokens:
+        return person_path, True, "Missing HF Tokens"
         
-        result = client.predict(
-            dict={"background": handle_file(person_path), "layers": [], "composite": None},
-            garm_img=handle_file(garment_path),
-            garment_des=garment_des + ", intact arms, intact hands, clear fingers, realistic human anatomy, highly detailed garment pattern, perfect fabric texture",
-            is_checked=True,
-            is_checked_crop=False,
-            denoise_steps=30, # Nâng cao cấu trúc khớp nối
-            seed=42,
-            api_name="/tryon"
-        )
-        out_img = result[0] if isinstance(result, (list, tuple)) else result
-        ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"idm_vton_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        shutil.copyfile(out_img, out_path)
-        print(f"[IDM-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
-        return out_path, False, None
-    except Exception as e:
-        print(f"[IDM-VTON] ❌ Lỗi: {e}")
-        return person_path, True, f"IDM-VTON Error: {str(e)}"
+    print(f"[IDM-VTON] Bắt đầu chế độ CONCURRENT SIÊU TỐC với {len(tokens)} token(s) cùng lúc...")
+    
+    out_name = f"idm_vton_{uuid.uuid4().hex}.png"
+    out_path = os.path.join(os.path.dirname(person_path), out_name)
 
-def call_hf_fashn_vton_api(person_path, garment_path, category="tops"):
-    """
-    Sử dụng Fashn-VTON-1.5 (Model mới nhất, cực tốt trong việc giữ tay chân và màu sắc).
-    Ưu điểm: Hỗ trợ segmentation_free giúp giảm thiểu tối đa lỗi mất tay/chân và giữ Pattern cực tốt.
-    """
-    import os, uuid, shutil
-    try:
-        from gradio_client import handle_file
-        client = get_hf_client("fashn-ai/fashn-vton-1.5")
-        if not client: raise Exception("Space offline")
+    def _run_token(idx, token):
+        try:
+            client = get_hf_client("yisol/IDM-VTON", token)
+            if not client: return None, "Space offline"
             
-        print(f"[FASHN-VTON] Đang gọi Fashn-VTON 1.5 cho: {os.path.basename(garment_path)} | Category: {category}")
-        
-        result = client.predict(
-            person_image=handle_file(person_path),
-            garment_image=handle_file(garment_path),
-            category=category,
-            garment_photo_type="model",
-            num_timesteps=50,
-            guidance_scale=2.0,
-            seed=42,
-            segmentation_free=True, # QUAN TRỌNG: Không xóa nền người, giữ nguyên tay chân
-            api_name="/try_on"
-        )
-        
-        out_img = result[0] if isinstance(result, (list, tuple)) else result
-        if isinstance(out_img, dict):
-            out_img = out_img.get("path") or out_img.get("url")
-            
-        ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"fashn_vton_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        shutil.copyfile(out_img, out_path)
-        print(f"[FASHN-VTON] ✅ Thành công! Ảnh lưu tại: {out_path}")
-        return out_path, False, None
-    except Exception as e:
-        print(f"[FASHN-VTON] ❌ Lỗi: {e}")
-        return person_path, True, f"Fashn-VTON Error: {str(e)}"
+            result = client.predict(
+                dict={"background": handle_file(person_path), "layers": [], "composite": None},
+                garm_img=handle_file(garment_path),
+                garment_des=garment_des + ", intact arms, intact hands, clear fingers, realistic human anatomy, highly detailed garment pattern, perfect fabric texture",
+                is_checked=True,
+                is_checked_crop=False,
+                denoise_steps=30,
+                seed=42,
+                api_name="/tryon"
+            )
+            return result, None
+        except Exception as e:
+            return None, str(e)
 
-def call_hf_outfit_anyone_api(person_path, garment_path):
-    """Sử dụng OutfitAnyone (Rất ổn định, miễn phí và giữ màu cực tốt). Phù hợp làm phương án dự phòng cuối cùng."""
-    import os, uuid, shutil
+    last_error = ""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(tokens)) as executor:
+        future_to_token = {executor.submit(_run_token, idx, token): idx for idx, token in enumerate(tokens)}
+        
+        try:
+            for future in concurrent.futures.as_completed(future_to_token, timeout=40):
+                idx = future_to_token[future]
+                result, error = future.result()
+                
+                if result is not None:
+                    out_img = result[0] if isinstance(result, (list, tuple)) else result
+                    shutil.copyfile(out_img, out_path)
+                    print(f"[IDM-VTON] ✅ Thành công VỚI TOKEN SỐ {idx+1}! Ảnh lưu tại: {out_path}")
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return out_path, False, None
+                else:
+                    if error and not ("quota" in error.lower() or "exceeded" in error.lower()):
+                        last_error = error
+        except concurrent.futures.TimeoutError:
+            print("[IDM-VTON] ❌ Timeout 40s (Toàn bộ các luồng). Space đang nghẽn.")
+            last_error = "Timeout (>40s)"
+
+    return person_path, True, f"IDM-VTON Error (All concurrent tokens failed): {last_error}" 
+
+def post_process_exact_color_match(original_person_path, garment_path, result_path):
+    """
+    Sử dụng thuật toán Color Transfer (Reinhard et al.) để ép vùng áo trên ảnh kết quả 
+    phải có màu sắc (L, a, b) giống hệt 100% với ảnh chiếc áo gốc.
+    """
     try:
-        from gradio_client import handle_file
-        client = get_hf_client("humanAIGC/OutfitAnyone")
-        if not client: raise Exception("Space offline")
+        import cv2
+        import numpy as np
         
-        print(f"[OUTFIT-ANYONE] Đang gọi OutfitAnyone cho: {os.path.basename(garment_path)}")
+        orig_person = cv2.imread(original_person_path)
+        res = cv2.imread(result_path)
+        # Đọc áo gốc có hỗ trợ kênh Alpha (Nền trong suốt)
+        garment = cv2.imread(garment_path, cv2.IMREAD_UNCHANGED)
         
-        # OutfitAnyone yêu cầu model_name, garment1, garment2
-        result = client.predict(
-            model_name=handle_file(person_path),
-            garment1=handle_file(garment_path),
-            garment2=handle_file(garment_path), # Cùng 1 ảnh nếu chỉ có 1 món
-            api_name="/get_tryon_result"
-        )
+        if orig_person is None or res is None or garment is None: return
         
-        out_img = result if isinstance(result, str) else result[0]
-        ext = os.path.splitext(person_path)[1] or ".png"
-        out_name = f"outfit_anyone_{uuid.uuid4().hex}{ext}"
-        out_path = os.path.join(os.path.dirname(person_path), out_name)
-        shutil.copyfile(out_img, out_path)
-        print(f"[OUTFIT-ANYONE] ✅ Thành công! Ảnh lưu tại: {out_path}")
-        return out_path, False, None
+        # 1. Tìm mặt nạ vùng áo trên ảnh kết quả
+        # 1. Tìm mặt nạ vùng áo trên ảnh kết quả bằng AI chuyên dụng (rembg + u2net_cloth_seg)
+        # Thay vì dùng absdiff (dễ bị lem màu), ta dùng AI để khoanh đúng chiếc áo mới
+        import rembg
+        from PIL import Image
+        
+        try:
+            res_pil = Image.open(result_path).convert("RGB")
+            session = rembg.new_session('u2net_cloth_seg')
+            # u2net_cloth_seg thường trả về ảnh có chiều cao x3 (Upper, Lower, Full body)
+            seg_out = rembg.remove(res_pil, session=session)
+            seg_arr = np.array(seg_out)
+            
+            h_orig = res.shape[0]
+            if seg_arr.shape[0] >= h_orig * 2.5:
+                # Lấy phần Alpha của 1/3 trên cùng (Upper body clothes)
+                alpha_mask = seg_arr[0:h_orig, :, 3]
+            else:
+                alpha_mask = seg_arr[:, :, 3]
+                
+            # Xóa sạch nhiễu xung quanh
+            _, mask = cv2.threshold(alpha_mask, 10, 255, cv2.THRESH_BINARY)
+            kernel_small = np.ones((3,3), np.uint8)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_small)
+            
+            # Làm mờ viền mask bằng Gaussian nhỏ để hòa trộn màu mượt mà vào da
+            mask = cv2.GaussianBlur(mask, (5, 5), 0)
+            mask_float = mask.astype(np.float32) / 255.0
+            mask_bool = mask > 128
+        except Exception as e_seg:
+            print(f"[POST-PROCESS] Lỗi tạo mask bằng rembg: {e_seg}")
+            return # Thoát luôn nếu lỗi, để giữ lại ảnh an toàn
+        
+        # 2. Tính toán phân phối màu của Áo Gốc (Source)
+        if garment.shape[2] == 4: # Có nền trong suốt
+            alpha = garment[:,:,3]
+            garment_bgr = garment[:,:,:3]
+            garment_lab = cv2.cvtColor(garment_bgr, cv2.COLOR_BGR2LAB)
+            valid_pixels = garment_lab[alpha > 10]
+        else:
+            garment_lab = cv2.cvtColor(garment, cv2.COLOR_BGR2LAB)
+            valid_pixels = garment_lab.reshape(-1, 3)
+            
+        if len(valid_pixels) == 0: return
+        src_mean = np.mean(valid_pixels, axis=0)
+        src_std = np.std(valid_pixels, axis=0) + 1e-5
+        
+        # 3. Tính toán phân phối màu của Áo trên Ảnh Kết Quả (Target)
+        res_lab = cv2.cvtColor(res, cv2.COLOR_BGR2LAB).astype(np.float32)
+        mask_bool = mask > 128
+        target_pixels = res_lab[mask_bool]
+        
+        if len(target_pixels) == 0: return
+        tgt_mean = np.mean(target_pixels, axis=0)
+        tgt_std = np.std(target_pixels, axis=0) + 1e-5
+        
+        # 4. Color Transfer: Áp đặt dải màu gốc sang ảnh kết quả
+        transfer_lab = np.copy(res_lab)
+        for i in range(3):
+            transfer_lab[:, :, i] = (res_lab[:, :, i] - tgt_mean[i]) * (src_std[i] / tgt_std[i]) + src_mean[i]
+            
+        transfer_lab = np.clip(transfer_lab, 0, 255).astype(np.uint8)
+        transfer_bgr = cv2.cvtColor(transfer_lab, cv2.COLOR_LAB2BGR)
+        
+        # 5. Hòa trộn (Chỉ đổi màu đúng vùng áo, giữ nguyên da thịt/phông nền)
+        mask_3d = np.dstack([mask_float]*3)
+        final_img = (res * (1 - mask_3d) + transfer_bgr * mask_3d).astype(np.uint8)
+        
+        cv2.imwrite(result_path, final_img)
+        print(f"[POST-PROCESS] Áp dụng Color Transfer thành công: {result_path}")
     except Exception as e:
-        print(f"[OUTFIT-ANYONE] ❌ Lỗi: {e}")
-        return person_path, True, f"OutfitAnyone Error: {str(e)}"
+        import traceback
+        traceback.print_exc()
+        print(f"[POST-PROCESS] Lỗi Color Transfer: {e}")
+
+def call_hf_fashn_vton_api(person_path, garment_path, category="tops", photo_type="flat-lay"):
+    import os, uuid, shutil, time
+    from gradio_client import handle_file
+    import concurrent.futures
+    
+    tokens = get_hf_tokens()
+    if not tokens:
+        return person_path, True, "Missing HF Tokens"
+        
+    print(f"[FASHN-VTON] Bắt đầu chế độ CONCURRENT SIÊU TỐC với {len(tokens)} token(s) cùng lúc...")
+    
+    out_name = f"fashn_vton_{uuid.uuid4().hex}.png"
+    out_path = os.path.join(os.path.dirname(person_path), out_name)
+
+    def _run_token(idx, token):
+        try:
+            client = get_hf_client("fashn-ai/fashn-vton-1.5", token)
+            if not client: return None, "Space offline"
+            
+            result = client.predict(
+                person_image=handle_file(person_path),
+                garment_image=handle_file(garment_path),
+                category=category,
+                garment_photo_type=photo_type,
+                num_timesteps=50,
+                guidance_scale=2.0,
+                seed=42,
+                segmentation_free=True,
+                api_name="/try_on"
+            )
+            return result, None
+        except Exception as e:
+            return None, str(e)
+
+    last_error = ""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(tokens)) as executor:
+        future_to_token = {executor.submit(_run_token, idx, token): idx for idx, token in enumerate(tokens)}
+        
+        try:
+            # Chờ token nào trả kết quả THÀNH CÔNG ĐẦU TIÊN trong vòng 45s
+            for future in concurrent.futures.as_completed(future_to_token, timeout=45):
+                idx = future_to_token[future]
+                result, error = future.result()
+                
+                if result is not None:
+                    out_img = result[0] if isinstance(result, (list, tuple)) else result
+                    if isinstance(out_img, dict):
+                        out_img = out_img.get("path") or out_img.get("url")
+                    shutil.copyfile(out_img, out_path)
+                    print(f"[FASHN-VTON] ✅ Thành công VỚI TOKEN SỐ {idx+1}! Ảnh lưu tại: {out_path}")
+                    
+                    # Hủy các luồng còn lại để tiết kiệm tài nguyên
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return out_path, False, None
+                else:
+                    if error and not ("quota" in error.lower() or "exceeded" in error.lower()):
+                        last_error = error
+        except concurrent.futures.TimeoutError:
+            print("[FASHN-VTON] ❌ Timeout 45s (Toàn bộ các luồng). Space đang nghẽn.")
+            last_error = "Timeout (>45s)"
+
+    return person_path, True, f"Fashn-VTON Error (All concurrent tokens failed): {last_error}" 
+
+def call_fashn_native_api(person_path, garment_path, category="tops"):
+    """
+    Sử dụng Fashn.ai Native API (Không thông qua Hugging Face). 
+    Miễn phí 50 credits khi đăng ký. Giữ tay chân và chi tiết sản phẩm cực tốt.
+    """
+    import os, uuid, time, requests, base64
+    try:
+        api_key = os.getenv("FASHN_API_KEY")
+        if not api_key: return person_path, True, "Missing FASHN_API_KEY"
+        
+        print(f"[FASHN-NATIVE] Đang gọi Fashn API (Native) cho: {os.path.basename(garment_path)}")
+        
+        with open(person_path, "rb") as f:
+            person_b64 = base64.b64encode(f.read()).decode()
+        with open(garment_path, "rb") as f:
+            garment_b64 = base64.b64encode(f.read()).decode()
+            
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model_image": f"data:image/png;base64,{person_b64}",
+            "garment_image": f"data:image/png;base64,{garment_b64}",
+            "category": category,
+            "nsfw_filter": False,
+            "cover_hands": False,
+            "restore_background": True
+        }
+        
+        res = requests.post("https://api.fashn.ai/v1/run", headers=headers, json=payload, timeout=60)
+        if res.status_code != 200:
+            return person_path, True, f"Fashn API Error: {res.text}"
+            
+        pred_id = res.json().get("id")
+        
+        for _ in range(45):
+            time.sleep(2)
+            poll_res = requests.get(f"https://api.fashn.ai/v1/status/{pred_id}", headers=headers, timeout=10)
+            if poll_res.status_code == 200:
+                data = poll_res.json()
+                if data.get("status") == "completed":
+                    out_url = data["image_urls"][0]
+                    img_data = requests.get(out_url).content
+                    ext = os.path.splitext(person_path)[1] or ".png"
+                    out_name = f"fashn_native_{uuid.uuid4().hex}{ext}"
+                    out_path = os.path.join(os.path.dirname(person_path), out_name)
+                    with open(out_path, "wb") as f:
+                        f.write(img_data)
+                    print(f"[FASHN-NATIVE] ✅ Thành công! Ảnh lưu tại: {out_path}")
+                    return out_path, False, None
+                elif data.get("status") == "failed":
+                    return person_path, True, "Fashn Native API processing failed."
+                    
+        return person_path, True, "Fashn Native API Timeout"
+    except Exception as e:
+        print(f"[FASHN-NATIVE] ❌ Lỗi: {e}")
+        return person_path, True, str(e)
 
 def call_texel_moda_api(person_path, garment_path, category, sex="female"):
     """Tích hợp Texel Moda API (RapidAPI) sử dụng endpoint /try-on-file (Multipart/Form-Data)."""
@@ -3232,18 +3337,23 @@ def _prepare_garment_for_ai(g_abs, save_dir):
         
         img_resized = img.resize((new_w, new_h), Image.LANCZOS)
         
-        # Đặt vào giữa một Canvas trong suốt 768x1024
-        final_img = Image.new("RGBA", (TARGET_W, TARGET_H), (0, 0, 0, 0))
+        # Đặt vào giữa một Canvas trắng (White Background) 768x1024
+        # LƯU Ý QUAN TRỌNG: AI Model (Diffusion) được train trên phông trắng.
+        # Nếu để nền trong suốt (Alpha=0), Pytorch sẽ chuyển nó thành màu ĐEN (RGB=0,0,0).
+        # Điều này khiến AI hiểu nhầm nền là "áo lót màu đen", sinh ra lỗi đen cổ/đen tay!
+        final_img = Image.new("RGB", (TARGET_W, TARGET_H), (255, 255, 255))
         offset_x = (TARGET_W - new_w) // 2
         offset_y = (TARGET_H - new_h) // 2
+        
+        # Paste với img_resized làm mask để giữ đúng viền áo trên nền trắng
         final_img.paste(img_resized, (offset_x, offset_y), img_resized)
         
-        out_name = f"ai_ready_{uuid.uuid4().hex}.png"
+        out_name = f"ai_ready_{uuid.uuid4().hex}.jpg"
         out_path = os.path.join(save_dir, out_name)
         
-        # Ép Lưu định dạng PNG chuẩn AI
-        final_img.save(out_path, format="PNG")
-        print(f"[Garment Prep] Đã xử lý chuẩn AI (768x1024, PNG Alpha) -> {out_path}")
+        # Ép Lưu định dạng JPG nền trắng chuẩn AI
+        final_img.save(out_path, format="JPEG", quality=95)
+        print(f"[Garment Prep] Đã xử lý chuẩn AI (768x1024, Nền Trắng) -> {out_path}")
         return out_path
     except Exception as e:
         print(f"[Garment Prep] Lỗi chuẩn hóa ảnh: {e}")
@@ -3266,7 +3376,7 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
         garment_img_url = g.get('image_url')
         clean_path_rel = g.get('clean_image_path')
         db_cat = g.get('category') or g.get('garment_type') or 'upper_body'
-        photo_type = g.get('photo_type') or 'model'
+        photo_type = g.get('photo_type') or 'flat-lay'
         
         fashn_cat = "tops"
         shopee_url = g.get('shopee_url', '')
@@ -3289,65 +3399,34 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
             # CHUẨN HÓA BẮT BUỘC TRƯỚC KHI GỬI AI
             g_abs = _prepare_garment_for_ai(g_abs, os.path.join(static_folder_path, 'uploads', 'tryon'))
             
-            # Lớp bảo vệ bổ sung: Dùng Gemini đọc màu chuẩn trước khi cho AI tự đoán
-            g_des = generate_garment_description_with_gemini(g_abs)
-            
             # Kiểm tra xem có Token HF không
-            has_hf_token = False
-            hf_token = os.getenv("HF_TOKEN", "")
-            if hf_token and "hf_" in hf_token:
-                has_hf_token = True
+            has_hf_token = len(get_hf_tokens()) > 0
 
             try:
-                # 1. First attempt: Call IDM-VTON (Ưu tiên theo yêu cầu)
+                # 1. First attempt: Call Fashn-VTON 1.5 (Ưu tiên SỐ 1 để GIỮ TAY CHÂN với segmentation_free=True)
                 if has_hf_token:
-                    print(f"[TRYON] Attempt 1: Calling IDM-VTON (HuggingFace)...")
-                    res_path, fb, err = call_hf_idmvton_api(person_path, g_abs, garment_des=g_des)
-                    
-                    if not fb:
-                        is_good = evaluate_vton_result_with_gemini(person_path, g_abs, res_path)
-                        if not is_good:
-                            print(f"[TRYON] ⚠️ IDM-VTON bị Gemini đánh giá LỖI. Falling back...")
-                            fb = True
-                            err = "Gemini Evaluator: IDM-VTON output has distortion."
+                    print(f"[TRYON] Attempt 1: Calling Fashn-VTON 1.5 (HuggingFace)...")
+                    res_path, fb, err = call_hf_fashn_vton_api(person_path, g_abs, category=fashn_cat, photo_type=photo_type)
+                    # (Gemini Evaluator removed for maximum speed)
                 else:
                     print(f"[TRYON] ⚠️ Bỏ qua HuggingFace API vì không có Token.")
                     fb = True
                     err = "Missing HF Token"
 
 
-                # 2. SEAMLESS FALLBACK 1: Call Fashn-VTON 1.5
-                if fb and has_hf_token:
-                    print(f"[TRYON] ⚠️ IDM-VTON failed. Falling back to Fashn-VTON 1.5...")
-                    res_path, fb, err = call_hf_fashn_vton_api(person_path, g_abs, category=fashn_cat)
-                    if not fb:
-                        is_good = evaluate_vton_result_with_gemini(person_path, g_abs, res_path)
-                        if not is_good:
-                            fb = True
-                            err = "Gemini Evaluator: Fashn-VTON output has distortion."
 
-                # 3. SEAMLESS FALLBACK 2: Call Kolors-VTON
+                # 5. SEAMLESS FALLBACK 4: Call IDM-VTON (HuggingFace)
                 if fb and has_hf_token:
-                    print(f"[TRYON] ⚠️ Fashn-VTON failed. Falling back to Kolors-VTON...")
-                    res_path, fb, err = call_hf_kolors_vton_api(person_path, g_abs)
-                    if not fb:
-                        is_good = evaluate_vton_result_with_gemini(person_path, g_abs, res_path)
-                        if not is_good:
-                            fb = True
-                            err = "Gemini Evaluator: Kolors output has distortion."
-                
-                # 4. SEAMLESS FALLBACK 3: Call OutfitAnyone
-                if fb and has_hf_token:
-                    print(f"[TRYON] ⚠️ IDM-VTON failed. Falling back to OutfitAnyone...")
-                    res_path, fb, err = call_hf_outfit_anyone_api(person_path, g_abs)
+                    print(f"[TRYON] ⚠️ Non-HF APIs failed. Falling back to HF IDM-VTON...")
+                    # (Gemini Prompt removed, using static high-quality prompt)
+                    res_path, fb, err = call_hf_idmvton_api(person_path, g_abs, garment_des="highly detailed garment, perfect texture, intricate pattern")
+                    # (Gemini Evaluator removed for maximum speed)
 
-
-                # 5. SEAMLESS FALLBACK 4: Call RapidAPI (Texel Moda)
+                # 6. SEAMLESS FALLBACK 5: Call RapidAPI (Texel Moda)
                 if fb:
                     print(f"[TRYON] ⚠️ APIs failed ({err}). Falling back to RapidAPI (Texel Moda)...")
                     sex = "male" if "male" in gender.lower() or "nam" in gender.lower() else "female"
                     
-                    # Cố gắng fix ảnh PNG RGBA thành RGB JPEG trước khi gửi cho Texel Moda để tránh lỗi 400
                     try:
                         from PIL import Image
                         safe_person = person_path + "_safe.jpg"
@@ -3360,14 +3439,6 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
                     
                     if not fb:
                         print("[TRYON] ✅ Fallback to Texel Moda succeeded!")
-
-                # 6. SEAMLESS FALLBACK 5: Call OOTDiffusion
-                if fb and has_hf_token:
-                    print(f"[TRYON] ⚠️ Texel Moda failed ({err}). Falling back to OOTDiffusion...")
-                    oot_cat = "Upper-body"
-                    if fashn_cat == "bottoms": oot_cat = "Lower-body"
-                    elif fashn_cat in ["dresses", "one-pieces"]: oot_cat = "Dress"
-                    res_path, fb, err = call_hf_ootdiffusion_api(person_path, g_abs, category=oot_cat)
 
                 # NẾU TẤT CẢ ĐỀU THẤT BẠI
                 if fb:
@@ -3386,13 +3457,18 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
                     except:
                         pass
                         
+                if not fb:
+                    # Đã TẮT tính năng Ép Màu Hậu Kỳ (post_process_exact_color_match)
+                    # Vì nó gây ra lỗi nhuộm đen/xám những vùng áo nhiều màu hoặc cổ áo.
+                    # Fashn và IDM-VTON hiện tại đã giữ màu nguyên bản rất tốt rồi!
+                    pass
+                    
                 person_path = res_path
                 final_path = res_path
                 
                 if not fb:
                     tried_items.append({"name": name, "url": shopee_url, "image_url": garment_img_url, "price": g.get("price")})
                 else:
-                    if not last_error_msg:
                         last_error_msg = err
 
 

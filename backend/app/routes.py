@@ -2836,9 +2836,15 @@ def _resolve_clean_abs(clean_rel, static_folder_path):
 def get_hf_tokens():
     import os
     tokens_str = os.getenv("HF_TOKENS", os.getenv("HF_TOKEN", ""))
-    if not tokens_str:
-        return []
-    tokens = [t.strip() for t in tokens_str.split(",") if t.strip() and "hf_" in t]
+    tokens = []
+    if tokens_str:
+        tokens = [t.strip() for t in tokens_str.split(",") if t.strip() and "hf_" in t]
+    
+    # Bypass giới hạn Token: Bổ sung "None" (Anonymous mode) để sử dụng hàng đợi công khai (Public Queue).
+    # Các luồng chạy song song, nếu token trả lỗi Quota, luồng Anonymous vẫn sẽ thành công.
+    if None not in tokens:
+        tokens.append(None)
+        
     return tokens
 
 HF_CLIENT_CACHE = {}
@@ -3062,18 +3068,27 @@ def post_process_exact_color_match(original_person_path, garment_path, result_pa
             return # Thoát luôn nếu lỗi, để giữ lại ảnh an toàn
         
         # 2. Tính toán phân phối màu của Áo Gốc (Source)
-        if garment.shape[2] == 4: # Có nền trong suốt
-            alpha = garment[:,:,3]
-            garment_bgr = garment[:,:,:3]
-            garment_lab = cv2.cvtColor(garment_bgr, cv2.COLOR_BGR2LAB)
-            valid_pixels = garment_lab[alpha > 10]
-        else:
-            garment_lab = cv2.cvtColor(garment, cv2.COLOR_BGR2LAB)
-            valid_pixels = garment_lab.reshape(-1, 3)
-            
-        if len(valid_pixels) == 0: return
-        src_mean = np.mean(valid_pixels, axis=0)
-        src_std = np.std(valid_pixels, axis=0) + 1e-5
+        try:
+            if garment.shape[2] == 4: # Có nền trong suốt
+                alpha = garment[:,:,3]
+                garment_bgr = garment[:,:,:3]
+                garment_lab = cv2.cvtColor(garment_bgr, cv2.COLOR_BGR2LAB)
+                valid_pixels = garment_lab[alpha > 10]
+            else:
+                # Dùng rembg để xóa phông nền trắng của ảnh sản phẩm gốc
+                g_pil = Image.fromarray(cv2.cvtColor(garment, cv2.COLOR_BGR2RGB))
+                g_seg = rembg.remove(g_pil, session=session)
+                g_seg_arr = np.array(g_seg)
+                alpha = g_seg_arr[:,:,3]
+                garment_lab = cv2.cvtColor(garment, cv2.COLOR_BGR2LAB)
+                valid_pixels = garment_lab[alpha > 50] # Chỉ lấy các điểm ảnh thực sự thuộc về áo
+                
+            if len(valid_pixels) == 0: return
+            src_mean = np.mean(valid_pixels, axis=0)
+            src_std = np.std(valid_pixels, axis=0) + 1e-5
+        except Exception as e_garment:
+            print(f"[POST-PROCESS] Lỗi khi xử lý ảnh áo gốc: {e_garment}")
+            return
         
         # 3. Tính toán phân phối màu của Áo trên Ảnh Kết Quả (Target)
         res_lab = cv2.cvtColor(res, cv2.COLOR_BGR2LAB).astype(np.float32)
@@ -3084,17 +3099,43 @@ def post_process_exact_color_match(original_person_path, garment_path, result_pa
         tgt_mean = np.mean(target_pixels, axis=0)
         tgt_std = np.std(target_pixels, axis=0) + 1e-5
         
-        # 4. Color Transfer: Áp đặt dải màu gốc sang ảnh kết quả
+        # 4. Color Transfer: Áp đặt dải màu gốc sang ảnh kết quả một cách AN TOÀN
         transfer_lab = np.copy(res_lab)
         for i in range(3):
-            transfer_lab[:, :, i] = (res_lab[:, :, i] - tgt_mean[i]) * (src_std[i] / tgt_std[i]) + src_mean[i]
+            # Giới hạn tỷ lệ std để tránh bị biến dạng màu (đen/xám) khi áo có nhiều màu hoặc hoa văn
+            std_ratio = np.clip(src_std[i] / tgt_std[i], 0.5, 2.0)
+            transfer_lab[:, :, i] = (res_lab[:, :, i] - tgt_mean[i]) * std_ratio + src_mean[i]
             
         transfer_lab = np.clip(transfer_lab, 0, 255).astype(np.uint8)
         transfer_bgr = cv2.cvtColor(transfer_lab, cv2.COLOR_LAB2BGR)
         
-        # 5. Hòa trộn (Chỉ đổi màu đúng vùng áo, giữ nguyên da thịt/phông nền)
+        # 5. Hòa trộn (Chỉ đổi màu đúng vùng áo)
         mask_3d = np.dstack([mask_float]*3)
         final_img = (res * (1 - mask_3d) + transfer_bgr * mask_3d).astype(np.uint8)
+        
+        # 6. REVERSE INPAINTING: Khôi phục lại QUẦN và PHÔNG NỀN cũ để chống AI "tưởng tượng"
+        try:
+            print(f"[POST-PROCESS] Đang trích xuất quần gốc để dán đè lên kết quả...")
+            orig_resized = cv2.resize(orig_person, (res.shape[1], res.shape[0]))
+            orig_pil = Image.fromarray(cv2.cvtColor(orig_resized, cv2.COLOR_BGR2RGB))
+            orig_seg = rembg.remove(orig_pil, session=session)
+            orig_seg_arr = np.array(orig_seg)
+            
+            if orig_seg_arr.shape[0] >= h_orig * 2.5:
+                # Trích xuất Lower Body (Quần/Váy dưới) từ ảnh gốc
+                pants_alpha = orig_seg_arr[h_orig:2*h_orig, :, 3]
+                _, pants_mask = cv2.threshold(pants_alpha, 10, 255, cv2.THRESH_BINARY)
+                pants_mask = cv2.GaussianBlur(pants_mask, (5, 5), 0)
+                pants_mask_float = pants_mask.astype(np.float32) / 255.0
+                pants_3d = np.dstack([pants_mask_float]*3)
+                
+                # Tránh việc quần cũ đè lên áo mới (Trường hợp áo mới dài hơn hoặc bỏ ngoài quần)
+                effective_pants = pants_3d * (1.0 - mask_3d)
+                
+                final_img = (final_img * (1.0 - effective_pants) + orig_resized * effective_pants).astype(np.uint8)
+                print(f"[POST-PROCESS] ✅ Đã dán đè quần gốc thành công, không bị cắt tay/chân!")
+        except Exception as p_err:
+            print(f"[POST-PROCESS] Bỏ qua lỗi Reverse Inpainting: {p_err}")
         
         cv2.imwrite(result_path, final_img)
         print(f"[POST-PROCESS] Áp dụng Color Transfer thành công: {result_path}")
@@ -3173,7 +3214,7 @@ def call_fashn_native_api(person_path, garment_path, category="tops"):
     """
     import os, uuid, time, requests, base64
     try:
-        api_key = os.getenv("FASHN_API_KEY")
+        api_key = os.getenv("FASHN_API_KEY", "pk_live_74e93dbb3de4f647a394ea4dec5fa05235f0c74150672ef2")
         if not api_key: return person_path, True, "Missing FASHN_API_KEY"
         
         print(f"[FASHN-NATIVE] Đang gọi Fashn API (Native) cho: {os.path.basename(garment_path)}")
@@ -3359,8 +3400,216 @@ def _prepare_garment_for_ai(g_abs, save_dir):
         print(f"[Garment Prep] Lỗi chuẩn hóa ảnh: {e}")
         return g_abs # Fallback về ảnh gốc nếu lỗi
 
+def call_pixelapi_vton(person_path, garment_path, category="upper_body", api_key="pk_live_74e93dbb3de4f647a394ea4dec5fa05235f0c74150672ef2"):
+    import requests, base64, time, os, uuid
+    print(f"[PixelAPI] Đang gọi PixelAPI Virtual Try-On cho: {os.path.basename(garment_path)}")
+    try:
+        def load_b64(path):
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+        
+        cat_map = {"tops": "upperbody", "bottoms": "lowerbody", "one-pieces": "dress"}
+        pixel_cat = cat_map.get(category, "upperbody")
+        
+        resp = requests.post(
+            "https://api.pixelapi.dev/v1/virtual-tryon",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "garment_image": load_b64(garment_path),
+                "person_image": load_b64(person_path),
+                "category": pixel_cat,
+                "n_steps": 50,
+                "image_scale": 2.0
+            },
+            timeout=60
+        )
+        
+        if resp.status_code != 200:
+            return person_path, True, f"PixelAPI Error: {resp.text}"
+            
+        job_id = resp.json().get("job_id")
+        if not job_id:
+            return person_path, True, "No job_id returned from PixelAPI"
+            
+        for _ in range(60):
+            time.sleep(2)
+            r = requests.get(f"https://api.pixelapi.dev/v1/virtual-tryon/jobs/{job_id}", headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
+            data = r.json()
+            if data.get("status") == "completed":
+                ext = os.path.splitext(person_path)[1] or ".png"
+                out_name = f"pixelapi_{uuid.uuid4().hex}{ext}"
+                out_path = os.path.join(os.path.dirname(person_path), out_name)
+                
+                if data.get("result_image_b64"):
+                    with open(out_path, "wb") as f:
+                        f.write(base64.b64decode(data.get("result_image_b64")))
+                    print(f"[PixelAPI] ✅ Thành công (Base64)! Ảnh lưu tại: {out_path}")
+                    return out_path, False, None
+                elif data.get("output_url"):
+                    img_data = requests.get(data.get("output_url")).content
+                    with open(out_path, "wb") as f:
+                        f.write(img_data)
+                    print(f"[PixelAPI] ✅ Thành công (URL)! Ảnh lưu tại: {out_path}")
+                    return out_path, False, None
+                else:
+                    return person_path, True, "PixelAPI completed but no image data found."
+            elif data.get("status") == "failed":
+                return person_path, True, "PixelAPI processing failed."
+                
+        return person_path, True, "PixelAPI Timeout"
+    except Exception as e:
+        print(f"[PixelAPI] ❌ Lỗi Exception: {e}")
+        return person_path, True, str(e)
+
+def call_tryona_vton(person_path, garment_path, shop_id="019ded84-1051-7559-84fc-e6596eb815e4", api_key="EzmrJog1oUXH8phMDrhCLHki"):
+    import requests, os, uuid
+    print(f"[TRYONA] Đang gọi TryOna API cho file: {os.path.basename(garment_path)}")
+    
+    # Sử dụng Private API Key do người dùng cung cấp
+    api_key = os.getenv("TRYONA_API_KEY", api_key)
+    
+    try:
+        headers = {
+            "tokenapi": api_key
+        }
+        
+        # TryOna cực kỳ quan trọng việc định dạng file. 
+        # Chúng ta gửi nguyên bản ảnh chất lượng cao để AI giữ được chi tiết.
+        files = {
+            "person_file": ("person.jpg", open(person_path, "rb"), "image/jpeg"),
+            "garment_file": ("garment.jpg", open(garment_path, "rb"), "image/jpeg")
+        }
+        
+        resp = requests.post(
+            "https://api.tryona.com/v1/tryon/simple",
+            headers=headers,
+            files=files,
+            timeout=120
+        )
+        
+        for f in files.values():
+            if hasattr(f[1], 'close'): f[1].close()
+            
+        if resp.status_code != 200:
+            err_msg = resp.text
+            if "Use private key" in err_msg or "errorCode\":101" in err_msg:
+                err_msg = "API Key của TryOna hiện tại là Public Key. TryOna yêu cầu phải dùng Private Key (Secret Key) để gọi API từ Backend. Vui lòng thêm TRYONA_API_KEY vào file .env."
+            print(f"[TRYONA] ❌ Lỗi từ TryOna API: {err_msg}")
+            return person_path, True, f"TryOna Error: {err_msg}"
+            
+        data = resp.json()
+        tryon_url = data.get("tryonImageUrl")
+        if not tryon_url:
+            return person_path, True, "TryOna returned no tryonImageUrl"
+            
+        # Download the resulting image
+        print(f"[TRYONA] Nhận được URL: {tryon_url}")
+        img_data = requests.get(tryon_url, timeout=30).content
+        ext = os.path.splitext(person_path)[1] or ".png"
+        out_name = f"tryona_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        with open(out_path, "wb") as f:
+            f.write(img_data)
+            
+        print(f"[TRYONA] ✅ Thành công! Đã lưu ảnh: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[TRYONA] ❌ Lỗi Exception: {e}")
+        return person_path, True, str(e)
+
+def call_api4ai_rapidapi_vton_key1(person_path, garment_path, api_key="b6e005e026msh936bacef0ddfea2p14355ajsnaa29961c2304"):
+    import requests, os, uuid, base64
+    print(f"[API4AI-K1] Đang gọi RapidAPI (Key 1) cho: {os.path.basename(garment_path)}")
+    try:
+        url = "https://virtual-try-on7.p.rapidapi.com/results"
+        headers = {
+            "x-rapidapi-host": "virtual-try-on7.p.rapidapi.com",
+            "x-rapidapi-key": api_key
+        }
+        
+        files = {
+            'image': ('person.jpg', open(person_path, 'rb'), 'image/jpeg'),
+            'image-apparel': ('garment.jpg', open(garment_path, 'rb'), 'image/jpeg')
+        }
+        
+        resp = requests.post(url, headers=headers, files=files, timeout=120)
+        
+        for f in files.values():
+            if hasattr(f[1], 'close'): f[1].close()
+            
+        if resp.status_code != 200:
+            err_msg = resp.text
+            print(f"[API4AI] ❌ Lỗi từ API: {err_msg}")
+            return person_path, True, f"API4AI Error: {err_msg}"
+            
+        data = resp.json()
+        try:
+            b64_img = data["results"][0]["entities"][0]["image"]
+        except (KeyError, IndexError):
+            return person_path, True, "API4AI trả về dữ liệu không hợp lệ"
+            
+        ext = os.path.splitext(person_path)[1] or ".jpg"
+        out_name = f"api4ai_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        
+        with open(out_path, "wb") as f:
+            f.write(base64.b64decode(b64_img))
+            
+        print(f"[API4AI-K1] ✅ Thành công! Đã lưu ảnh: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[API4AI-K1] ❌ Lỗi Exception: {e}")
+        return person_path, True, str(e)
+
+
+def call_api4ai_rapidapi_vton_key2(person_path, garment_path, api_key="41bc05ce03msh67626f796ce6555p1c4872jsn5c4fa2d8cedd"):
+    import requests, os, uuid, base64
+    print(f"[API4AI-K2] Đang gọi RapidAPI (Key 2) cho: {os.path.basename(garment_path)}")
+    try:
+        url = "https://virtual-try-on7.p.rapidapi.com/results"
+        headers = {
+            "x-rapidapi-host": "virtual-try-on7.p.rapidapi.com",
+            "x-rapidapi-key": api_key
+        }
+        
+        files = {
+            'image': ('person.jpg', open(person_path, 'rb'), 'image/jpeg'),
+            'image-apparel': ('garment.jpg', open(garment_path, 'rb'), 'image/jpeg')
+        }
+        
+        resp = requests.post(url, headers=headers, files=files, timeout=120)
+        
+        for f in files.values():
+            if hasattr(f[1], 'close'): f[1].close()
+            
+        if resp.status_code != 200:
+            err_msg = resp.text
+            print(f"[API4AI-K2] ❌ Lỗi từ API: {err_msg}")
+            return person_path, True, f"API4AI Error: {err_msg}"
+            
+        data = resp.json()
+        try:
+            b64_img = data["results"][0]["entities"][0]["image"]
+        except (KeyError, IndexError):
+            return person_path, True, "API4AI trả về dữ liệu không hợp lệ"
+            
+        ext = os.path.splitext(person_path)[1] or ".jpg"
+        out_name = f"api4ai_k2_{uuid.uuid4().hex}{ext}"
+        out_path = os.path.join(os.path.dirname(person_path), out_name)
+        
+        with open(out_path, "wb") as f:
+            f.write(base64.b64decode(b64_img))
+            
+        print(f"[API4AI-K2] ✅ Thành công! Đã lưu ảnh: {out_path}")
+        return out_path, False, None
+    except Exception as e:
+        print(f"[API4AI-K2] ❌ Lỗi Exception: {e}")
+        return person_path, True, str(e)
+
+
 
 def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folder_path, gender="female"):
+
     import time
     t_start = time.time()
     
@@ -3396,6 +3645,7 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
         print(f"[TRYON] Resolved garment path: {g_abs}")
         if g_abs and os.path.exists(g_abs):
             
+            g_abs_orig = g_abs
             # CHUẨN HÓA BẮT BUỘC TRƯỚC KHI GỬI AI
             g_abs = _prepare_garment_for_ai(g_abs, os.path.join(static_folder_path, 'uploads', 'tryon'))
             
@@ -3403,28 +3653,41 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
             has_hf_token = len(get_hf_tokens()) > 0
 
             try:
-                # 1. First attempt: Call Fashn-VTON 1.5 (Ưu tiên SỐ 1 để GIỮ TAY CHÂN với segmentation_free=True)
-                if has_hf_token:
-                    print(f"[TRYON] Attempt 1: Calling Fashn-VTON 1.5 (HuggingFace)...")
+                # 1. First attempt: Call TryOna API (Highest Quality, keeps original pose/clothes)
+                print(f"[TRYON] Attempt 1: Calling TryOna API...")
+                res_path, fb, err = call_tryona_vton(person_path, g_abs)
+                
+                # 2. Second attempt: API4AI Key 1
+                if fb:
+                    print(f"[TRYON] ⚠️ TryOna failed ({err}). Attempt 2: Calling API4AI Key 1...")
+                    res_path, fb, err = call_api4ai_rapidapi_vton_key1(person_path, g_abs)
+                
+                # 3. Third attempt: API4AI Key 2
+                if fb:
+                    print(f"[TRYON] ⚠️ API4AI K1 failed ({err}). Attempt 3: Calling API4AI Key 2...")
+                    res_path, fb, err = call_api4ai_rapidapi_vton_key2(person_path, g_abs)
+
+                # 4. Fourth attempt: Call Fashn-VTON 1.5 (HuggingFace)
+                if fb and has_hf_token:
+                    print(f"[TRYON] ⚠️ API4AI K2 failed ({err}). Attempt 4: Calling Fashn-VTON 1.5 (HuggingFace)...")
                     res_path, fb, err = call_hf_fashn_vton_api(person_path, g_abs, category=fashn_cat, photo_type=photo_type)
-                    # (Gemini Evaluator removed for maximum speed)
-                else:
-                    print(f"[TRYON] ⚠️ Bỏ qua HuggingFace API vì không có Token.")
+                elif fb and not has_hf_token:
+                    print(f"[TRYON] ⚠️ Bỏ qua Fashn-VTON vì không có HF Token.")
                     fb = True
                     err = "Missing HF Token"
 
 
 
-                # 5. SEAMLESS FALLBACK 4: Call IDM-VTON (HuggingFace)
+                # 4. Fourth attempt: Call IDM-VTON (HuggingFace)
                 if fb and has_hf_token:
-                    print(f"[TRYON] ⚠️ Non-HF APIs failed. Falling back to HF IDM-VTON...")
+                    print(f"[TRYON] ⚠️ Non-HF APIs failed. Attempt 4: Calling HF IDM-VTON...")
                     # (Gemini Prompt removed, using static high-quality prompt)
                     res_path, fb, err = call_hf_idmvton_api(person_path, g_abs, garment_des="highly detailed garment, perfect texture, intricate pattern")
                     # (Gemini Evaluator removed for maximum speed)
 
-                # 6. SEAMLESS FALLBACK 5: Call RapidAPI (Texel Moda)
+                # 5. Fifth attempt: Call RapidAPI (Texel Moda)
                 if fb:
-                    print(f"[TRYON] ⚠️ APIs failed ({err}). Falling back to RapidAPI (Texel Moda)...")
+                    print(f"[TRYON] ⚠️ APIs failed ({err}). Attempt 5: Calling RapidAPI (Texel Moda)...")
                     sex = "male" if "male" in gender.lower() or "nam" in gender.lower() else "female"
                     
                     try:
@@ -3458,10 +3721,14 @@ def _run_vton_pipeline_v2(in_path, garments, results_dir, out_path, static_folde
                         pass
                         
                 if not fb:
-                    # Đã TẮT tính năng Ép Màu Hậu Kỳ (post_process_exact_color_match)
-                    # Vì nó gây ra lỗi nhuộm đen/xám những vùng áo nhiều màu hoặc cổ áo.
-                    # Fashn và IDM-VTON hiện tại đã giữ màu nguyên bản rất tốt rồi!
-                    pass
+                    # Đã bật lại tính năng ép màu hậu kỳ để giữ đúng màu sản phẩm.
+                    # Phiên bản này đã được cải tiến để không làm xỉn màu áo họa tiết
+                    # và dùng U2Net phân vùng áo nên an toàn không lẹm vào tay chân!
+                    try:
+                        print(f"[TRYON] Đang thực hiện hậu kỳ giữ màu sắc gốc...")
+                        post_process_exact_color_match(person_path, g_abs_orig, res_path)
+                    except Exception as color_err:
+                        print(f"[TRYON] Bỏ qua lỗi hậu kỳ màu: {color_err}")
                     
                 person_path = res_path
                 final_path = res_path

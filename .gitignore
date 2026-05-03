@@ -50,3 +50,4 @@ frontend/static/normalized_selected/*
 *.bin
 *.pkl
 .env
+tmp/

@@ -1,11 +1,10 @@
+# AI & Data Inference Workflow
 
-# AI & Data Workflow Setup
-
-This document outlines how to use the newly created AI Training and Data Crawling modules.
+This document outlines the workflow for data collection and AI-powered recommendations within the AuraFit platform. Note that this system is designed to use pre-trained models for inference, and regular users do not need to perform AI training.
 
 ## 1. Prerequisites
 
-Before running any AI scripts, you need to install the dependencies.
+To run the internal AI and data processing scripts:
 
 ```bash
 pip install -r requirements_ai.txt
@@ -14,52 +13,41 @@ playwright install
 
 ## 2. Directory Structure
 
-- **`data_engine/`**: Contains scripts for crawling storage.
-    - `crawler_shopee.py`: The main script to scrape product data from Shopee.
-- **`ai_engine/`**: Contains AI model definitions and training scripts.
-    - `train_recommender.py`: A PyTorch-based training pipeline for the Outfit Recommender system.
+- **`data_engine/`**: Automated data collection and cleaning.
+    - `crawler_shopee.py`: Scrapes product data from Shopee for the recommendation catalog.
+- **`ai_engine/`**: Contains AI logic and pre-trained model weights.
+    - `train_recommender.py`: Internal script used to generate recommendation logic weights.
+    - `train_bodyshape.py`: Internal script for body shape classification logic.
 
-## 3. Workflow 1: Crawling Data (Shopee)
+## 3. Data Collection Workflow (Internal)
 
-The crawler uses `Playwright` to simulate a real browser interaction. It navigates, scrolls (to handle lazy loading), and extracts product details.
+The system uses `Playwright` to simulate browser interactions for product discovery.
 
-**To Run the Crawler:**
+**To update the product catalog:**
 
 ```bash
 python data_engine/crawler_shopee.py
 ```
 
 *Output:*
-- The script will launch a browser (Chromium).
-- It searches for keywords (e.g., "váy nữ", "áo thun nam").
-- Scraped data is saved as a JSON file in `datasets/shopee_data/`.
+- Scraped product details are saved to `datasets/shopee_data/`.
+- Images are automatically cleaned using AI background removal (U2-Net).
 
-## 4. Workflow 2: Training the AI Model
+## 4. Smart Recommendation Workflow
 
-The recommender system uses a simple Neural Network (PyTorch) to predict the compatibility score between a User Profile and an Outfit.
+The recommendation engine uses an internal model to match user body stats with appropriate clothing styles.
 
-**To Train the Model:**
+**How it works (Backend Logic):**
+1.  **User Profiling**: The system takes user input (height, weight, measurements).
+2.  **Product Matching**: The engine calculates a compatibility score between the user profile and products in the catalog.
+3.  **Output**: The top-scoring items are displayed as "AI Styled" recommendations on the frontend.
 
-```bash
-python ai_engine/train_recommender.py
-```
+## 5. Virtual Try-On Integration
 
-*Output:*
-- The script simulates a training dataset (User Features + Outfit Features).
-- It runs a training loop for 10 Epochs.
-- The trained model is saved to `ai_engine/outfit_recommender.pth`.
+The Virtual Try-On feature utilizes a multi-tier API fallback system. It does NOT require local model training.
 
-## 5. Next Steps (Integration)
-
-To connect this to your main Flask app:
-
-1.  **Load the Model**: In `backend/app.py`, load the saved `outfit_recommender.pth`.
-2.  **Inference API**: Create an endpoint `/api/recommend` that:
-    - Takes User Body Stats from the request.
-    - Loads the scraped products from `datasets/shopee_data/`.
-    - Feeds User Stats + Product Features into the Model.
-    - Returns the products with the highest scores.
+- **Primary Engine**: TryOna API (Cloud-based inference).
+- **Secondary Engine**: Fashn-VTON / API4AI (Cloud-based inference).
 
 ---
-**Note on Virtual Try-On:**
-Training a full Virtual Try-On model (like VITON-HD or Stable Diffusion) requires powerful GPUs (NVIDIA RTX 3090+) and 10GB+ of VRAM. It is recommended to use an external API (like Replicate or HuggingFace Inference API) for this feature in a local/production environment initially.
+*Note: For production, ensure all API keys are correctly configured in your .env file. Direct training of the Try-On model is not required as the system utilizes state-of-the-art pre-trained SOTA models via secure API gateways.*

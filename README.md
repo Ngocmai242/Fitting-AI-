@@ -1,70 +1,110 @@
 # AuraFit (Fitting-AI) - AI Virtual Try-On & Style Recommendation System
 
-## Introduction
-AuraFit (Fitting-AI) is an e-commerce platform integrating Artificial Intelligence (AI) to provide a realistic online shopping experience:
-1. Virtual Try-On: Try clothes on your actual photos with high realism. The system uses a multi-tier fallback pipeline with SOTA models to ensure 100% success rate and high speed.
-2. Smart Styling: Analyzes Body Shape using Computer Vision algorithms, then combines fashion rules to provide personalized outfit recommendations.
+AuraFit is an advanced e-commerce solution that leverages state-of-the-art Artificial Intelligence to provide a seamless and realistic online shopping experience. The system combines high-fidelity virtual fitting with personalized style recommendations based on body shape analysis.
 
-## Project Structure
-- /frontend/: User Interface (HTML, CSS, Vanilla JS).
-- /backend/: API Server orchestrating the entire system (Python & Flask).
-  - /backend/app/routes.py: Core logic for Virtual Try-On with automated fallback mechanism.
-- /data_engine/: Automated web scraping (Crawler) and garment background removal system.
-- /database/: Stores user information and product catalogs (SQLite).
+## 🚀 Key Features
 
-## Installation & Getting Started
-The system uses npm to manage and run both the frontend and backend simultaneously.
+1.  **AI Virtual Try-On**: Try on clothes using your own photos with high realism. The system employs a multi-tier fallback pipeline utilizing SOTA models (TryOna, Fashn-VTON, IDM-VTON) to ensure a 100% success rate.
+2.  **Smart Styling & Recommendations**: Uses Computer Vision (YOLOv8) to analyze user body shape and metrics, providing personalized outfit suggestions based on professional fashion rules.
+3.  **Automated Data Engine**: Integrated Shopee crawler with AI-powered background removal and image cleaning for high-quality product listings.
 
-1. System Requirements
-- Python 3.9+
-- Node.js (latest version)
+---
 
-2. Environment Setup
-Open the Terminal at the project root directory and run:
+## 🛠️ System Architecture
+
+-   **Frontend**: Vanilla JavaScript, HTML5, and CSS3. Features a minimalist pastel design for a premium user experience.
+-   **Backend**: Python Flask API orchestrating AI workflows, user sessions, and product management.
+-   **AI Engine**:
+    *   **Computer Vision**: YOLOv8 for clothing detection and classification.
+    *   **Image Processing**: U2-Net / BirefNet for automated background removal.
+    *   **Virtual Try-On**: Multi-tier API integration (TryOna, API4AI, HuggingFace, RapidAPI).
+-   **Database**: SQLite managed via SQLAlchemy ORM.
+
+---
+
+## ⚙️ Installation & Setup
+
+### 1. Prerequisites
+- **Python**: 3.9 or higher.
+- **Node.js**: Latest stable version.
+
+### 2. Environment Setup
+Clone the repository and install the required dependencies:
+
+```bash
 # Install Python libraries
 pip install -r backend/requirements.txt
 pip install -r requirements_ai.txt
 
-# Install Playwright for the Crawler
+# Install Playwright browsers for the Crawler
 playwright install
 
-# Install Node.js tools
+# Install Node.js tools and server management packages
 npm install
+```
 
-3. Environment Variables (.env)
-Edit the backend/.env file with your API Keys:
-TRYONA_API_KEY="Your Private Key"
-HF_TOKEN="HuggingFace Token"
-RAPIDAPI_KEY="RapidAPI Key"
+### 3. Configuration
+Configure your environment variables in `backend/.env`:
+```env
+TRYONA_API_KEY="Your_Private_Key"
+HF_TOKEN="Your_HuggingFace_Token"
+RAPIDAPI_KEY="Your_RapidAPI_Key"
+```
 
-4. Start the System
-Run a single command:
+---
+
+## 🏃 How to Run the System
+
+The system is designed for ease of use with multiple ways to start the services.
+
+### Option 1: Using NPM (Recommended)
+Run a single command to start both the backend and frontend simultaneously:
+```bash
 npm start
+```
 
-This command will automatically:
-- Launch the Python Flask Backend on port 8080.
-- Serve the Frontend interface.
-- Automatically open your browser to the Admin Dashboard.
+### Option 2: Using Batch Files (Windows)
+Double-click `Run_Project_Final.bat` in the root directory. This will:
+1.  Check and install missing requirements.
+2.  Launch the **VITON-HD Local API**.
+3.  Start the **Flask Production Server** (Waitress).
+4.  Automatically open the **Admin Dashboard** in your default browser.
 
-## AI Pipeline Architecture (Virtual Try-On)
-The system utilizes a multi-tier processing workflow to maximize quality and reliability:
+---
 
-1. API Priority (Fallback Pipeline):
-- Tier 1: TryOna API (Primary - Best for pose and garment detail preservation).
-- Tier 2: Virtual Try On (API4AI - Key 1).
-- Tier 3: Virtual Try On (API4AI - Key 2 Fallback).
-- Tier 4: Fashn-VTON 1.5 (HuggingFace).
-- Tier 5: IDM-VTON (HuggingFace).
-- Tier 6: Texel Moda (RapidAPI).
+## 📊 AI Pipeline Details
 
-2. Advanced Post-Processing:
-- Background Removal & Normalization: Automatically removes product backgrounds and aligns them to 768x1024 ratio.
-- Exact Color Match: Uses Reinhard Color Transfer with background masking to ensure the garment color in the result perfectly matches the original product photo without overexposure.
-- Reverse Inpainting: Uses the U2Net model to segment the original pants/skirt and background, then pastes them back onto the AI result. This ensures 100% preservation of the original lower-body clothes and prevents loss of limbs or anatomical distortions.
+### 1. Multi-Tier VTON Fallback
+To ensure high availability and quality, the system attempts inference in the following order:
+- **Tier 1**: TryOna API (Primary - Best detail preservation).
+- **Tier 2**: API4AI Virtual Try On (Key 1).
+- **Tier 3**: API4AI Virtual Try On (Key 2 Fallback).
+- **Tier 4**: Fashn-VTON 1.5 (HuggingFace).
+- **Tier 5**: IDM-VTON (HuggingFace).
+- **Tier 6**: Texel Moda (RapidAPI).
 
-## Demo Access Information
-- Admin Dashboard:
-  - URL: http://localhost:8080/admin_login.html
-  - User: admin
-  - Pass: admin
-- Customer Homepage: http://localhost:8080/index.html
+### 2. Post-Processing Excellence
+- **Background Normalization**: Products are automatically aligned to a 768x1024 ratio.
+- **Exact Color Match**: Uses Reinhard Color Transfer to prevent overexposure and ensure garment colors match the original product photo.
+- **Reverse Inpainting**: Segments original body parts (like legs/arms) and background to ensure anatomical integrity and 100% preservation of non-replaced clothing items.
+
+---
+
+## 🔑 Access Information
+
+-   **Admin Dashboard**:
+    *   URL: `http://localhost:8080/admin_login.html`
+    *   Default Credentials: `admin` / `admin`
+-   **Customer Homepage**: `http://localhost:8080/index.html`
+
+---
+
+## 📂 Project Structure
+```text
+├── backend/            # Flask API, routes, and business logic
+├── frontend/           # Web interface (HTML/CSS/JS)
+├── data_engine/        # Crawler and data processing scripts
+├── VITON-HD/           # Local VTON API components
+├── database/           # SQLite database files
+└── scripts/            # Utility and maintenance scripts
+```

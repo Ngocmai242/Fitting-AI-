@@ -2,7 +2,7 @@
 
 AuraFit is an advanced e-commerce solution that leverages state-of-the-art Artificial Intelligence to provide a seamless and realistic online shopping experience. The system combines high-fidelity virtual fitting with personalized style recommendations based on body shape analysis.
 
-## 🚀 Key Features
+## Key Features
 
 1.  **AI Virtual Try-On**: Try on clothes using your own photos with high realism. The system employs a multi-tier fallback pipeline utilizing SOTA models (TryOna, Fashn-VTON, IDM-VTON) to ensure a 100% success rate.
 2.  **Smart Styling & Recommendations**: Uses Computer Vision (YOLOv8) to analyze user body shape and metrics, providing personalized outfit suggestions based on professional fashion rules.
@@ -10,7 +10,7 @@ AuraFit is an advanced e-commerce solution that leverages state-of-the-art Artif
 
 ---
 
-## 🛠️ System Architecture
+## System Architecture
 
 -   **Frontend**: Vanilla JavaScript, HTML5, and CSS3. Features a minimalist pastel design for a premium user experience.
 -   **Backend**: Python Flask API orchestrating AI workflows, user sessions, and product management.
@@ -22,7 +22,7 @@ AuraFit is an advanced e-commerce solution that leverages state-of-the-art Artif
 
 ---
 
-## ⚙️ Installation & Setup
+## Installation & Setup
 
 ### 1. Prerequisites
 - **Python**: 3.9 or higher.
@@ -53,7 +53,7 @@ RAPIDAPI_KEY="Your_RapidAPI_Key"
 
 ---
 
-## 🏃 How to Run the System
+## How to Run the System
 
 The system is designed for ease of use with multiple ways to start the services.
 
@@ -72,7 +72,7 @@ Double-click `Run_Project_Final.bat` in the root directory. This will:
 
 ---
 
-## 📊 AI Pipeline Details
+## AI Pipeline Details
 
 ### 1. Multi-Tier VTON Fallback
 To ensure high availability and quality, the system attempts inference in the following order:
@@ -90,7 +90,7 @@ To ensure high availability and quality, the system attempts inference in the fo
 
 ---
 
-## 🔑 Access Information
+## Access Information
 
 -   **Admin Dashboard**:
     *   URL: `http://localhost:8080/admin_login.html`
@@ -99,7 +99,7 @@ To ensure high availability and quality, the system attempts inference in the fo
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 ```text
 ├── backend/            # Flask API, routes, and business logic
 ├── frontend/           # Web interface (HTML/CSS/JS)
